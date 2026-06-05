@@ -26,21 +26,47 @@
 - **Multi-level Menus** — Organize commands in nested folders
 - **Scenario Sequences** — Chain multiple actions per menu item
 
-### Gallery
+---
+
+## 🖼️ Gallery
 
 <div align="center">
 
-| Hardware Components | Device In Use |
-|:-------------------:|:-------------:|
-| ![Components](assets/device-details.jpg) | ![In Action](assets/device-in-action.jpg) |
-| Technical reference: Pico, OLED, encoder, sensors | Real-world deployment |
+### Hardware Components
 
-| Config Studio Editor | Navigation & Execution Demo |
-|:--------------------:|:---------------------------:|
-| ![Editor](assets/html-ui-instrument.png) | ![Demo](assets/scenario-execution.gif) |
-| Web-based visual configuration tool | Menu navigation and command execution |
+![Device Details](assets/device-details.jpg)
+
+*Technical reference: Raspberry Pi Pico, SSD1306 OLED display, KY-040 rotary encoder, Hall effect sensors*
 
 </div>
+
+---
+
+### Device In Action
+
+![Device In Use](assets/device-in-action.jpg)
+
+*Real-world deployment and operational view*
+
+---
+
+### Config Studio Editor
+
+![Visual Configuration Tool](assets/html-ui-instrument.png)
+
+*Web-based JSON editor for visual configuration*
+
+---
+
+### Navigation & Execution Demo
+
+![Menu Navigation](assets/scenario-execution.gif)
+
+*Live demonstration of menu navigation and command execution*
+
+---
+
+### Video Demonstration
 
 **Full Video Demo**: [Watch on YouTube](https://youtu.be/huUQviQJ-Cw)
 
@@ -664,6 +690,16 @@ Copyright (c) 2024 makepkg
 
 - **Issues**: [GitHub Issues](https://github.com/yourusername/pico-comander/issues)
 - **Documentation**: See inline code comments and `config.json` examples
+
+---
+
+## 💰 Donations
+
+If you find this project useful, consider supporting its development:
+
+**USDT BEP-20**: `0xd03499C9c6100Af624603b4D6fb185A65694745C`  
+**USDT TRC-20**: `TUAzeSrKeDYbt6HCs9PL6q1t5amHHdnnwR`  
+**USDT SOLANA**: `2cecCCh8pzUNmEpjLQ3aa9sfPL5KXqANrmSfiiDWubCj`
 
 ---
 

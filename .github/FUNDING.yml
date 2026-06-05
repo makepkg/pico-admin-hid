@@ -1,0 +1,19 @@
+# GitHub Sponsors funding file
+# This file enables the "Sponsor" button in GitHub repository
+
+# Supported funding platforms:
+# github: [username]
+# patreon: username
+# open_collective: projectname
+# ko_fi: username
+# tidelift: npm/package-name
+# community_bridge: project-name
+# liberapay: username
+# issuehunt: username
+# otechie: username
+# lfx_crowdfunding: project-name
+# custom: ['https://example.com']
+
+# Crypto donation addresses (displayed as custom links)
+custom:
+  - 'https://etherscan.io/address/0xd03499C9c6100Af624603b4D6fb185A65694745C'
