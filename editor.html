@@ -1,0 +1,2568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico Macro Pad — Config Studio</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- SortableJS for drag and drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <style>
+        :root {
+            --bg-main: #0a0b10;
+            --bg-panel: #12131a;
+            --bg-card: #1b1d2a;
+            --bg-card-hover: #232738;
+            --border: #2c2f44;
+            --text-main: #f0f2f5;
+            --text-muted: #8b92b6;
+            --accent-cyan: #00e5ff;
+            --accent-green: #00ff88;
+            --accent-orange: #ff9100;
+            --accent-red: #ff3366;
+            --font-outfit: 'Outfit', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --shadow: 0 10px 30px rgba(0,0,0,0.5);
+            --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            font-family: var(--font-outfit);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-main);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* Header */
+        header {
+            background: rgba(18, 19, 26, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            color: #000;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-family: var(--font-mono);
+            letter-spacing: 1px;
+            font-size: 0.85rem;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+            font-family: var(--font-outfit);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+
+        .btn:hover {
+            border-color: var(--accent-cyan);
+            background: var(--bg-card-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.1), rgba(0, 255, 136, 0.1));
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.1);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.2), rgba(0, 255, 136, 0.2));
+            border-color: var(--accent-green);
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.25);
+        }
+
+        .btn-danger {
+            border-color: rgba(255, 51, 102, 0.5);
+            background: rgba(255, 51, 102, 0.05);
+        }
+        .btn-danger:hover {
+            background: rgba(255, 51, 102, 0.15);
+            border-color: var(--accent-red);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.8rem;
+            border-radius: 6px;
+        }
+
+        /* Workspace Grid */
+        .workspace {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 340px 1fr 340px;
+            height: calc(100vh - 65px);
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .main-canvas {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: var(--bg-main);
+        }
+
+        .inspector {
+            background: var(--bg-panel);
+            border-left: 1px solid var(--border);
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Cards and sections */
+        .section-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Form Controls */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input[type="text"], input[type="number"], select {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: var(--text-main);
+            font-family: var(--font-outfit);
+            font-size: 0.9rem;
+            width: 100%;
+            transition: var(--transition);
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.15);
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            user-select: none;
+            padding: 4px 0;
+        }
+
+        .checkbox-group input {
+            cursor: pointer;
+        }
+
+        .pin-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        /* Sensor Row in configuration list */
+        .sensor-item-row {
+            display: grid;
+            grid-template-columns: 1fr 70px 50px auto;
+            gap: 8px;
+            align-items: center;
+            background: var(--bg-main);
+            padding: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        /* Tabs Control */
+        .tabs-header {
+            display: flex;
+            background: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            color: var(--accent-cyan);
+        }
+
+        .tab-btn.active::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent-cyan);
+            box-shadow: 0 0 10px var(--accent-cyan);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .tab-content.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Tree & Drag-n-Drop Elements */
+        .tree-container, .scenario-list-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .tree-list, .step-list {
+            min-height: 50px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tree-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            cursor: grab;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .tree-item:active {
+            cursor: grabbing;
+        }
+
+        .tree-item-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .tree-item-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            width: 100%;
+        }
+
+        .item-badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .badge-folder {
+            background: rgba(255, 145, 0, 0.15);
+            color: var(--accent-orange);
+            border: 1px solid rgba(255, 145, 0, 0.3);
+        }
+
+        .badge-action {
+            background: rgba(0, 229, 255, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+        }
+
+        .tree-item-sublist {
+            margin-left: 20px;
+            padding-left: 10px;
+            border-left: 1px dashed var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 20px;
+        }
+
+        /* Context Menu (Right Click) */
+        .context-menu {
+            position: fixed;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            display: none;
+            flex-direction: column;
+            padding: 6px 0;
+            z-index: 1000;
+            min-width: 180px;
+            backdrop-filter: blur(5px);
+        }
+
+        .context-menu-item {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            color: var(--text-main);
+            cursor: pointer;
+            text-align: left;
+            background: none;
+            border: none;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+
+        .context-menu-item:hover {
+            background: var(--bg-card-hover);
+            color: var(--accent-cyan);
+        }
+
+        .context-menu-separator {
+            height: 1px;
+            background: var(--border);
+            margin: 4px 0;
+        }
+
+        /* Scenarios Editor */
+        .scenarios-grid {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 1.5rem;
+            height: 100%;
+        }
+
+        .scenario-selector {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            overflow-y: auto;
+        }
+
+        .scenario-option {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            text-align: left;
+            transition: var(--transition);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-main);
+        }
+
+        .scenario-option:hover, .scenario-option.active {
+            border-color: var(--accent-cyan);
+            background: var(--bg-card-hover);
+        }
+
+        .scenario-option.active {
+            color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.05);
+            border-color: var(--accent-cyan);
+        }
+
+        .scenario-canvas {
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+        }
+
+        .toolbox-steps {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+
+        .tool-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        .tool-btn:hover {
+            border-color: var(--accent-green);
+            background: var(--bg-card-hover);
+        }
+
+        .step-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 100px 1fr auto;
+            gap: 1rem;
+            align-items: center;
+            cursor: grab;
+            transition: var(--transition);
+        }
+
+        .step-card:active {
+            cursor: grabbing;
+        }
+
+        .step-type {
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .type-key { color: var(--accent-cyan); }
+        .type-type { color: var(--accent-green); }
+        .type-wait { color: var(--accent-orange); }
+        .type-enter { color: var(--text-main); }
+
+        .step-fields {
+            display: flex;
+            gap: 10px;
+        }
+
+        .step-delete-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: var(--transition);
+            line-height: 1;
+        }
+
+        .step-delete-btn:hover {
+            color: var(--accent-red);
+        }
+
+        /* Empty state styling */
+        .empty-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            text-align: center;
+            color: var(--text-muted);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            height: 100%;
+        }
+
+        .empty-placeholder svg {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            stroke: var(--text-muted);
+        }
+
+        /* Raw view */
+        .raw-view {
+            width: 100%;
+            height: 100%;
+            background: #050608;
+            color: #d1d4e0;
+            font-family: var(--font-mono);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem;
+            resize: none;
+            outline: none;
+        }
+
+        /* Header logo visual */
+        .svg-icon {
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .invisible {
+            display: none !important;
+        }
+
+        .text-accent {
+            color: var(--accent-cyan);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-group">
+            <span class="logo-badge">PICO</span>
+            <h1>Config Studio</h1>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="triggerLoadFile()">
+                <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+                Load config.json
+            </button>
+            <input type="file" id="json-file-input" class="invisible" accept=".json" onchange="handleFileSelected(event)">
+
+            <button class="btn btn-primary" onclick="downloadConfig()">
+                <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Save config.json
+            </button>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <!-- Sidebar: Device Settings -->
+        <aside class="sidebar">
+            <div>
+                <h3 class="section-title">Device Configuration</h3>
+                <div class="card">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="dev-armed" onchange="updateDeviceField('armed', this.checked)">
+                        <label for="dev-armed">Armed (Hall Sensors active)</label>
+                    </div>
+                    <div class="form-group">
+                        <label for="dev-debounce">Hall Debounce (ms)</label>
+                        <input type="number" id="dev-debounce" onchange="updateDeviceField('debounce_ms', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('debounce_ms', parseInt(this.value)); this.blur(); }">
+                    </div>
+                    <div class="form-group">
+                        <label for="dev-cooldown">Cooldown (ms)</label>
+                        <input type="number" id="dev-cooldown" onchange="updateDeviceField('cooldown_ms', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('cooldown_ms', parseInt(this.value)); this.blur(); }">
+                    </div>
+                    <div class="form-group">
+                        <label for="dev-screen-timeout">Screen Timeout (seconds)</label>
+                        <input type="number" id="dev-screen-timeout" onchange="updateDeviceField('screen_timeout_s', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('screen_timeout_s', parseInt(this.value)); this.blur(); }" placeholder="0 to disable">
+                    </div>
+                    <div class="form-group">
+                        <label for="dev-screensaver">Screensaver Mode</label>
+                        <select id="dev-screensaver" onchange="updateDeviceField('screensaver', this.value)">
+                            <option value="off">Off (Screen turns black)</option>
+                            <option value="tesseract">4D Tesseract Animation</option>
+                            <option value="starfield">3D Starfield Animation</option>
+                            <option value="matrix">Matrix Rain Animation</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="section-title">Hardware Pins Configuration</h3>
+                <div class="card">
+                    <div class="pin-grid">
+                        <div class="form-group">
+                            <label for="hw-enc-clk">Encoder CLK</label>
+                            <input type="number" id="hw-enc-clk" onchange="updateHardwareField('encoder_clk', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_clk', parseInt(this.value)); this.blur(); }">
+                        </div>
+                        <div class="form-group">
+                            <label for="hw-enc-dt">Encoder DT</label>
+                            <input type="number" id="hw-enc-dt" onchange="updateHardwareField('encoder_dt', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_dt', parseInt(this.value)); this.blur(); }">
+                        </div>
+                        <div class="form-group">
+                            <label for="hw-enc-sw">Encoder SW</label>
+                            <input type="number" id="hw-enc-sw" onchange="updateHardwareField('encoder_sw', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_sw', parseInt(this.value)); this.blur(); }">
+                        </div>
+                        <div class="form-group">
+                            <label for="hw-btn">Button Pin</label>
+                            <input type="number" id="hw-btn" onchange="updateHardwareField('button_pin', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('button_pin', parseInt(this.value)); this.blur(); }">
+                        </div>
+                        <div class="form-group">
+                            <label for="hw-led">LED Pin</label>
+                            <input type="number" id="hw-led" onchange="updateHardwareField('led_pin', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('led_pin', parseInt(this.value)); this.blur(); }">
+                        </div>
+                        <div class="form-group">
+                            <label for="hw-sda">OLED SDA</label>
+                            <input type="number" id="hw-sda" onchange="updateHardwareField('display_sda', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('display_sda', parseInt(this.value)); this.blur(); }">
+                        </div>
+                        <div class="form-group">
+                            <label for="hw-scl">OLED SCL</label>
+                            <input type="number" id="hw-scl" onchange="updateHardwareField('display_scl', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('display_scl', parseInt(this.value)); this.blur(); }">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="section-title">
+                    <span>Hall Sensors</span>
+                    <button class="btn btn-sm btn-primary" onclick="addHallSensor()" style="padding: 2px 6px;">+ Add</button>
+                </h3>
+                <div id="hall-sensors-container" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+
+            <div>
+                <h3 class="section-title">Passive Sensors triggers</h3>
+                <div id="passive-triggers-list" class="card">
+                    <!-- Loaded dynamically -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace (Tabs & Editors) -->
+        <main class="main-canvas">
+            <div class="tabs-header">
+                <button class="tab-btn active" onclick="switchTab('tab-menu')">Menu Hierarchy</button>
+                <button class="tab-btn" onclick="switchTab('tab-scenarios')">Scenarios Editor</button>
+                <button class="tab-btn" onclick="switchTab('tab-raw')">Raw JSON View</button>
+            </div>
+
+            <!-- Tab: Menu Hierarchy -->
+            <div id="tab-menu" class="tab-content active">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem; align-items: center;">
+                    <p style="color: var(--text-muted); font-size: 0.95rem;">Drag & drop items to structure folders, or <b>Right Click</b> on them for quick actions!</p>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-primary" onclick="addRootMenuItem('action')">+ Add Root Action</button>
+                        <button class="btn btn-primary" onclick="addRootMenuItem('folder')">+ Add Root Folder</button>
+                    </div>
+                </div>
+                <div class="tree-container">
+                    <div id="menu-tree" class="tree-list"></div>
+                </div>
+            </div>
+
+            <!-- Tab: Scenarios -->
+            <div id="tab-scenarios" class="tab-content">
+                <div class="scenarios-grid">
+                    <div class="scenario-selector">
+                        <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); padding: 5px;">Scenarios</h4>
+                        <input type="text" id="scenario-search-input" placeholder="Search scenarios..." oninput="filterScenariosList(this.value)" style="margin-bottom: 8px;">
+                        <div id="scenarios-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+                        <button class="btn" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="addNewScenario()">+ Add Scenario</button>
+                    </div>
+
+                    <div class="scenario-canvas">
+                        <div id="scenario-editor-header" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                            <h3 id="current-scenario-title" style="font-family:var(--font-mono); flex:1;">Select scenario...</h3>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:0.75rem; color:var(--text-muted);">
+                                    💡 Press <kbd style="background:var(--bg-main); padding:2px 6px; border-radius:4px; border:1px solid var(--border); font-size:0.7rem;">Delete</kbd>
+                                </span>
+                                <button class="btn btn-danger btn-sm" id="btn-delete-scenario" onclick="deleteActiveScenario()">Delete Scenario</button>
+                            </div>
+                        </div>
+
+                        <div id="scenario-steps-container" class="invisible">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                                <h4 style="font-size:0.9rem; color:var(--text-muted); margin:0;">Step toolbox (Click or drag steps below):</h4>
+                                <span style="font-size:0.75rem; color:var(--text-muted);">
+                                    💡 <kbd style="background:var(--bg-main); padding:2px 4px; border-radius:3px; border:1px solid var(--border); font-size:0.7rem;">Ctrl+Del</kbd> to delete step
+                                </span>
+                            </div>
+                            <div class="toolbox-steps">
+                                <div class="tool-btn" data-type="type" draggable="true" ondragstart="handleStepDragStart(event)" onclick="handleToolboxClick('type')">Type text</div>
+                                <div class="tool-btn" data-type="key" draggable="true" ondragstart="handleStepDragStart(event)" onclick="handleToolboxClick('key')">KeyPress combo</div>
+                                <div class="tool-btn" data-type="wait" draggable="true" ondragstart="handleStepDragStart(event)" onclick="handleToolboxClick('wait')">Wait MS</div>
+                                <div class="tool-btn" data-type="enter" draggable="true" ondragstart="handleStepDragStart(event)" onclick="handleToolboxClick('enter')">Press Enter</div>
+                            </div>
+
+                            <h4 style="margin-bottom: 0.8rem; font-size:0.9rem; color:var(--text-muted);">Steps sequence:</h4>
+                            <div id="scenario-steps-list" class="step-list">
+                                <!-- Steps list -->
+                            </div>
+                        </div>
+
+                        <div id="scenario-empty" class="empty-placeholder">
+                            <svg viewBox="0 0 24 24" class="svg-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                            <p>Choose or create a scenario on the left panel to begin editing its steps.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab: Raw JSON -->
+            <div id="tab-raw" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Edit the raw JSON configuration. Changes apply when you click "Apply Changes" or switch tabs.</p>
+                    <button class="btn btn-primary" onclick="applyRawJsonChanges()">Apply Changes</button>
+                </div>
+                <textarea id="raw-json-textarea" class="raw-view" onblur="syncRawJson(this.value)" onkeydown="if(event.ctrlKey && event.key==='s') { event.preventDefault(); applyRawJsonChanges(); }"></textarea>
+            </div>
+        </main>
+
+        <!-- Right Side: Item Inspector -->
+        <aside class="inspector">
+            <h3 class="section-title">Inspector</h3>
+            <div id="inspector-content" class="empty-placeholder" style="height: auto;">
+                <p>Click on any menu item or folder to view and edit its parameters.</p>
+            </div>
+
+            <div id="inspector-edit-panel" class="card invisible">
+                <div class="form-group">
+                    <label for="inspect-id">Item ID <span style="color: var(--accent-orange);">*required, unique</span></label>
+                    <input type="text" id="inspect-id" onblur="updateInspectedItemId(this.value)" onkeydown="if(event.key==='Enter') { updateInspectedItemId(this.value); this.blur(); }" placeholder="e.g., menu_item_1 (a-z, 0-9, _ only)" style="font-family: var(--font-mono);">
+                </div>
+                <div class="form-group">
+                    <label for="inspect-label">Display Label</label>
+                    <input type="text" id="inspect-label" onblur="updateInspectedItem('label', this.value)" onkeydown="if(event.key==='Enter') { updateInspectedItem('label', this.value); this.blur(); }">
+                </div>
+
+                <div class="form-group">
+                    <label>Item Type</label>
+                    <div style="display:flex; gap:10px;">
+                        <label class="checkbox-group">
+                            <input type="radio" name="inspect-type" id="inspect-type-action" onchange="toggleItemType('action')"> Action
+                        </label>
+                        <label class="checkbox-group">
+                            <input type="radio" name="inspect-type" id="inspect-type-folder" onchange="toggleItemType('folder')"> Folder
+                        </label>
+                    </div>
+                </div>
+
+                <div id="inspect-folder-actions-panel" class="form-group invisible">
+                    <label>Add inside this folder</label>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:5px;">
+                        <button class="btn btn-sm btn-primary" onclick="addChildToInspectedFolder('action')">+ Action</button>
+                        <button class="btn btn-sm btn-primary" onclick="addChildToInspectedFolder('folder')">+ Folder</button>
+                    </div>
+                </div>
+
+                <div id="inspect-sequence-panel" class="form-group">
+                    <label style="display:flex; justify-content:space-between; align-items: center;">
+                        <span>Action sequence (optional)</span>
+                        <button class="btn" style="padding: 2px 8px; font-size: 0.8rem;" onclick="addSequenceEntry()">+ Add</button>
+                    </label>
+                    <div id="inspect-sequence-hint" style="display:none; font-size:0.8rem; color:var(--text-muted); padding:8px; background:rgba(0,229,255,0.05); border-left:2px solid var(--accent-cyan); border-radius:4px; margin-top:4px;">
+                        💡 For folders: sequence executes <b>when entering</b> the folder, then opens submenu
+                    </div>
+                    <div id="inspect-sequence-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                </div>
+
+                <div style="margin-top:15px; display:flex; gap:10px;">
+                    <button class="btn btn-danger" style="flex:1; justify-content:center;" onclick="deleteInspectedItem()">Delete item</button>
+                </div>
+                <div style="margin-top:8px; font-size:0.75rem; color:var(--text-muted); text-align:center;">
+                    💡 Tip: Press <kbd style="background:var(--bg-main); padding:2px 6px; border-radius:4px; border:1px solid var(--border);">Delete</kbd> to remove selected item
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Custom Context Menu (Right Click) -->
+    <div id="custom-context-menu" class="context-menu"></div>
+
+    <script>
+        // Core state
+        let configData = {
+            hardware: {},
+            device: {},
+            passive: {},
+            active_menu: [],
+            scenarios: {}
+        };
+
+        let selectedItemRef = null; // Ref to current menu item being edited
+        let activeScenarioName = null; // Name of current scenario being edited
+        let scenarioFilterQuery = ""; // Query to filter scenarios
+        let contextMenuTarget = null; // Target of context menu
+
+        // Default skeleton if loaded empty
+        const defaultSkeleton = {
+            hardware: {
+                hall_sensors: [
+                    {"id": "hall_sensor_1", "pin": 15, "active_low": true},
+                    {"id": "hall_sensor_2", "pin": 16, "active_low": true}
+                ],
+                button_pin: 24,
+                led_pin: 25,
+                encoder_clk: 6,
+                encoder_dt: 7,
+                encoder_sw: 8,
+                display_sda: 4,
+                display_scl: 5
+            },
+            device: {
+                debounce_ms: 300,
+                cooldown_ms: 5000,
+                armed: true,
+                screen_timeout_s: 15,
+                screensaver: "tesseract"
+            },
+            passive: {
+                hall_sensor_1: "scenario_shutdown",
+                hall_sensor_2: "scenario_shutdown",
+                btn_double: "scenario_lock"
+            },
+            active_menu: [],
+            scenarios: {}
+        };
+
+        // Initialize empty or with skeleton
+        window.addEventListener('load', () => {
+            loadConfigObject(JSON.parse(JSON.stringify(defaultSkeleton)));
+
+            // Global click listeners to close context menu
+            window.addEventListener('click', hideContextMenu);
+            window.addEventListener('scroll', hideContextMenu);
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    hideContextMenu();
+                }
+                
+                // Delete key handler for selected items
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    // Check if we're not in an input field
+                    const activeElement = document.activeElement;
+                    if (activeElement.tagName === 'INPUT' || 
+                        activeElement.tagName === 'TEXTAREA' || 
+                        activeElement.tagName === 'SELECT') {
+                        return; // Let the input handle it normally
+                    }
+                    
+                    // Prevent backspace navigation
+                    e.preventDefault();
+                    
+                    const currentTab = document.querySelector('.tab-content.active');
+                    
+                    // Menu tab - delete selected menu item
+                    if (currentTab && currentTab.id === 'tab-menu' && selectedItemRef) {
+                        if (confirm(`Delete menu item "${selectedItemRef.item.label || selectedItemRef.item.id}"?`)) {
+                            const node = selectedItemRef.node;
+                            selectedItemRef = null;
+                            document.getElementById('inspector-content').classList.remove('invisible');
+                            document.getElementById('inspector-edit-panel').classList.add('invisible');
+                            node.remove();
+                            saveAndSyncMenu();
+                        }
+                    }
+                    
+                    // Scenarios tab - delete active scenario
+                    else if (currentTab && currentTab.id === 'tab-scenarios' && activeScenarioName) {
+                        if (confirm(`Delete scenario "${activeScenarioName}" and all its steps?`)) {
+                            delete configData.scenarios[activeScenarioName];
+                            activeScenarioName = null;
+                            renderScenariosList();
+                            updateScenarioEditor();
+                            renderPassiveTriggers();
+                            if (selectedItemRef) renderInspectorSequence();
+                        }
+                    }
+                }
+            });
+        });
+
+        // Switch Workspace Tabs
+        function switchTab(tabId) {
+            // If leaving raw JSON tab, try to sync changes
+            const currentTab = document.querySelector('.tab-content.active');
+            if (currentTab && currentTab.id === 'tab-raw') {
+                const textarea = document.getElementById('raw-json-textarea');
+                syncRawJson(textarea.value);
+            }
+
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+            // Find button mapping to tabId
+            const btnIndex = tabId === 'tab-menu' ? 0 : tabId === 'tab-scenarios' ? 1 : 2;
+            document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+
+            // Manage inspector visibility based on active tab
+            const inspectorContent = document.getElementById('inspector-content');
+            const inspectorEditPanel = document.getElementById('inspector-edit-panel');
+
+            if (tabId === 'tab-menu') {
+                // On Menu tab: show inspector if item is selected
+                if (selectedItemRef) {
+                    inspectorContent.classList.add('invisible');
+                    inspectorEditPanel.classList.remove('invisible');
+                } else {
+                    inspectorContent.classList.remove('invisible');
+                    inspectorEditPanel.classList.add('invisible');
+                }
+            } else {
+                // On Scenarios or Raw JSON tabs: hide inspector, show placeholder
+                inspectorContent.classList.remove('invisible');
+                inspectorEditPanel.classList.add('invisible');
+            }
+
+            if (tabId === 'tab-raw') {
+                // Always show current config when entering Raw JSON view
+                document.getElementById('raw-json-textarea').value = JSON.stringify(configData, null, 2);
+            }
+            hideContextMenu();
+        }
+
+        // File loading helpers
+        function triggerLoadFile() {
+            console.log('triggerLoadFile called');
+            const input = document.getElementById('json-file-input');
+            if (!input) {
+                console.error('File input element not found!');
+                alert('Error: File input element not found. Please refresh the page.');
+                return;
+            }
+            console.log('File input found:', input);
+            input.value = ''; // Clear previous selection to allow selecting the same file again
+            try {
+                input.click();
+                console.log('File input clicked');
+            } catch (err) {
+                console.error('Error triggering file picker:', err);
+                alert('Error opening file picker: ' + err.message);
+            }
+        }
+
+        function handleFileSelected(event) {
+            console.log('handleFileSelected called', event);
+            const file = event.target.files[0];
+            if (!file) {
+                console.log('No file selected');
+                return;
+            }
+
+            console.log('File selected:', file.name);
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    loadConfigObject(parsed);
+                    console.log('Config loaded successfully');
+                } catch (err) {
+                    console.error('JSON parse error:', err);
+                    alert('Invalid JSON file format! ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Apply loaded configuration to state and UI
+        function loadConfigObject(obj) {
+            configData = {
+                hardware: obj.hardware || {},
+                device: obj.device || {},
+                passive: obj.passive || {},
+                active_menu: obj.active_menu || [],
+                scenarios: obj.scenarios || {}
+            };
+
+            // Sidebar values
+            document.getElementById('dev-armed').checked = !!configData.device.armed;
+            document.getElementById('dev-debounce').value = configData.device.debounce_ms || 300;
+            document.getElementById('dev-cooldown').value = configData.device.cooldown_ms || 5000;
+            document.getElementById('dev-screen-timeout').value = configData.device.screen_timeout_s || 0;
+            document.getElementById('dev-screensaver').value = configData.device.screensaver || "off";
+
+            // Hardware Pin fields
+            document.getElementById('hw-enc-clk').value = configData.hardware.encoder_clk || 6;
+            document.getElementById('hw-enc-dt').value = configData.hardware.encoder_dt || 7;
+            document.getElementById('hw-enc-sw').value = configData.hardware.encoder_sw || 8;
+            document.getElementById('hw-btn').value = configData.hardware.button_pin || 24;
+            document.getElementById('hw-led').value = configData.hardware.led_pin || 25;
+            document.getElementById('hw-sda').value = configData.hardware.display_sda || 4;
+            document.getElementById('hw-scl').value = configData.hardware.display_scl || 5;
+
+            renderHallSensors();
+            renderPassiveTriggers();
+            renderMenuTree();
+            renderScenariosList();
+
+            // Clear inspector
+            selectedItemRef = null;
+            document.getElementById('inspector-content').classList.remove('invisible');
+            document.getElementById('inspector-edit-panel').classList.add('invisible');
+
+            // Reset scenarios
+            activeScenarioName = null;
+            updateScenarioEditor();
+        }
+
+        // Helper to rebuild active_menu from DOM tree and update selected references to prevent staling
+        function saveAndSyncMenu() {
+            configData.active_menu = serializeMenuTree(document.getElementById('menu-tree'));
+            if (selectedItemRef) {
+                const liveItem = findMenuItemDeep(configData.active_menu, selectedItemRef.node.dataset.id);
+                if (liveItem) {
+                    selectedItemRef.item = liveItem;
+                }
+            }
+        }
+
+        // Save and Download config.json
+        function downloadConfig() {
+            saveAndSyncMenu();
+
+            // Validate configuration before saving
+            const warnings = validateConfig();
+            if (warnings.length > 0) {
+                const message = '⚠️ Configuration has some issues:\n\n' +
+                    warnings.join('\n') +
+                    '\n\nDevice will still work, but these commands may not execute as expected.\n\nContinue saving?';
+                if (!confirm(message)) {
+                    return;
+                }
+            }
+
+            const content = JSON.stringify(configData, null, 2);
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'config.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Validate configuration for common issues
+        function validateConfig() {
+            const warnings = [];
+
+            // Check scenarios for empty steps
+            Object.keys(configData.scenarios).forEach(scenarioName => {
+                const steps = configData.scenarios[scenarioName];
+                steps.forEach((step, idx) => {
+                    if (step.action === 'type' && (!step.value || step.value.trim() === '')) {
+                        warnings.push(`• Scenario "${scenarioName}" step ${idx + 1}: Empty text to type`);
+                    }
+                    if (step.action === 'key' && (!step.combo || step.combo.trim() === '')) {
+                        warnings.push(`• Scenario "${scenarioName}" step ${idx + 1}: Empty key combination`);
+                    }
+                    if (step.action === 'wait' && (step.ms === undefined || step.ms < 0)) {
+                        warnings.push(`• Scenario "${scenarioName}" step ${idx + 1}: Invalid wait time`);
+                    }
+                    if (step.action === 'enter' && (step.count === undefined || step.count < 1)) {
+                        warnings.push(`• Scenario "${scenarioName}" step ${idx + 1}: Invalid enter count`);
+                    }
+                });
+            });
+
+            // Check menu items for empty sequences and IDs
+            function checkMenuItems(items, path = 'Root') {
+                items.forEach(item => {
+                    if (!item.id || item.id.trim() === '') {
+                        warnings.push(`• Menu item "${path}/${item.label || '(no label)'}": Missing ID`);
+                    }
+                    if (item.sequence && item.sequence.length === 0 && !item.submenu) {
+                        warnings.push(`• Menu item "${path}/${item.label || item.id}": Has empty sequence (no scenarios bound)`);
+                    }
+                    if (item.submenu) {
+                        checkMenuItems(item.submenu, `${path}/${item.label || item.id}`);
+                    }
+                });
+            }
+            checkMenuItems(configData.active_menu);
+
+            // Check hall sensors for empty IDs
+            if (configData.hardware.hall_sensors) {
+                configData.hardware.hall_sensors.forEach((sensor, idx) => {
+                    if (!sensor.id || sensor.id.trim() === '') {
+                        warnings.push(`• Hall Sensor ${idx + 1}: Missing ID`);
+                    }
+                    if (sensor.pin === undefined || sensor.pin < 0) {
+                        warnings.push(`• Hall Sensor ${idx + 1} (${sensor.id}): Invalid pin number`);
+                    }
+                });
+            }
+
+            return warnings;
+        }
+
+        // Sync RAW text input
+        function syncRawJson(text) {
+            // Allow clearing config with empty text
+            if (!text || text.trim() === '') {
+                return; // Don't auto-apply empty config on blur/switch
+            }
+
+            try {
+                const parsed = JSON.parse(text);
+                loadConfigObject(parsed);
+            } catch(e) {
+                // Ignore parsing error until it becomes valid JSON
+            }
+        }
+
+        function applyRawJsonChanges() {
+            const textarea = document.getElementById('raw-json-textarea');
+            const text = textarea.value.trim();
+
+            // Handle empty input - reset to default skeleton
+            if (!text) {
+                if (confirm('This will reset the configuration to default skeleton. Continue?')) {
+                    loadConfigObject(JSON.parse(JSON.stringify(defaultSkeleton)));
+                    alert('Configuration reset to default!');
+                }
+                return;
+            }
+
+            try {
+                const parsed = JSON.parse(text);
+                loadConfigObject(parsed);
+
+                // Validate after loading
+                const warnings = validateConfig();
+                if (warnings.length > 0) {
+                    alert('⚠️ Configuration loaded, but has some issues:\n\n' + warnings.join('\n') +
+                          '\n\nDevice will still work, but these commands may not execute as expected.');
+                } else {
+                    alert('Configuration applied successfully!');
+                }
+            } catch(e) {
+                alert('Invalid JSON format!\n\n' + e.message + '\n\nPlease fix the JSON syntax and try again.');
+            }
+        }
+
+        // Device form updates
+        function updateDeviceField(field, val) {
+            configData.device[field] = val;
+        }
+
+        function updateHardwareField(field, val) {
+            configData.hardware[field] = val;
+        }
+
+        // Dynamic Hall Sensors Configuration
+        function renderHallSensors() {
+            const container = document.getElementById('hall-sensors-container');
+            container.innerHTML = '';
+
+            if (!configData.hardware.hall_sensors) {
+                configData.hardware.hall_sensors = [];
+            }
+
+            if (configData.hardware.hall_sensors.length === 0) {
+                container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:8px;">No sensors defined</div>`;
+                return;
+            }
+
+            configData.hardware.hall_sensors.forEach((sensor, idx) => {
+                const row = document.createElement('div');
+                row.className = 'sensor-item-row';
+                row.innerHTML = `
+                    <div class="form-group">
+                        <input type="text" value="${escapeHtml(sensor.id)}" placeholder="ID" style="padding:4px 8px; font-size:0.8rem;" onchange="updateHallSensorField(${idx}, 'id', this.value)" onkeydown="if(event.key==='Enter') { updateHallSensorField(${idx}, 'id', this.value); this.blur(); }">
+                    </div>
+                    <div class="form-group">
+                        <input type="number" value="${sensor.pin}" placeholder="Pin" style="padding:4px 8px; font-size:0.8rem;" onchange="updateHallSensorField(${idx}, 'pin', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHallSensorField(${idx}, 'pin', parseInt(this.value)); this.blur(); }">
+                    </div>
+                    <div class="checkbox-group" style="justify-content:center;">
+                        <input type="checkbox" ${sensor.active_low ? 'checked' : ''} onchange="updateHallSensorField(${idx}, 'active_low', this.checked)" title="Active Low">
+                    </div>
+                    <button class="step-delete-btn" onclick="deleteHallSensor(${idx})" style="padding: 0 4px;">&times;</button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function addHallSensor() {
+            const count = configData.hardware.hall_sensors ? configData.hardware.hall_sensors.length + 1 : 1;
+            const newId = `hall_sensor_${count}`;
+            const newSensor = {
+                id: newId,
+                pin: 15,
+                active_low: true
+            };
+            if (!configData.hardware.hall_sensors) configData.hardware.hall_sensors = [];
+            configData.hardware.hall_sensors.push(newSensor);
+
+            if (!configData.passive[newId]) {
+                configData.passive[newId] = "scenario_shutdown";
+            }
+
+            renderHallSensors();
+            renderPassiveTriggers();
+        }
+
+        function updateHallSensorField(idx, field, val) {
+            const sensor = configData.hardware.hall_sensors[idx];
+            const oldId = sensor.id;
+
+            if (field === 'id') {
+                val = val.trim().replace(/\s+/g, '_').toLowerCase();
+                const exists = configData.hardware.hall_sensors.some((s, sIdx) => s.id === val && sIdx !== idx);
+                if (exists) {
+                    alert('Sensor ID must be unique!');
+                    renderHallSensors();
+                    return;
+                }
+                sensor.id = val;
+
+                if (configData.passive[oldId]) {
+                    configData.passive[val] = configData.passive[oldId];
+                    delete configData.passive[oldId];
+                }
+            } else {
+                sensor[field] = val;
+            }
+
+            renderHallSensors();
+            renderPassiveTriggers();
+        }
+
+        function deleteHallSensor(idx) {
+            const sensor = configData.hardware.hall_sensors[idx];
+            if (sensor && configData.passive[sensor.id]) {
+                delete configData.passive[sensor.id];
+            }
+            configData.hardware.hall_sensors.splice(idx, 1);
+            renderHallSensors();
+            renderPassiveTriggers();
+        }
+
+        // Passive sensors list
+        function renderPassiveTriggers() {
+            const list = document.getElementById('passive-triggers-list');
+            list.innerHTML = '';
+
+            const triggers = [];
+            if (configData.hardware.hall_sensors) {
+                configData.hardware.hall_sensors.forEach(s => {
+                    triggers.push({ id: s.id, label: `Hall sensor (${s.id})` });
+                });
+            }
+            triggers.push({ id: 'btn_double', label: 'Button Double Click' });
+
+            triggers.forEach(t => {
+                const currentScenario = configData.passive[t.id] || "";
+
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.marginBottom = '8px';
+                formGroup.innerHTML = `
+                    <label>${t.label}</label>
+                    <select onchange="updatePassiveTrigger('${t.id}', this.value)">
+                        <option value="">(None)</option>
+                        ${getScenariosOptions(currentScenario)}
+                    </select>
+                `;
+                list.appendChild(formGroup);
+            });
+        }
+
+        function updatePassiveTrigger(triggerId, scenarioVal) {
+            if (scenarioVal === "") {
+                delete configData.passive[triggerId];
+            } else {
+                configData.passive[triggerId] = scenarioVal;
+            }
+        }
+
+        // Options helper
+        function getScenariosOptions(selectedName) {
+            return Object.keys(configData.scenarios).map(name => {
+                return `<option value="${name}" ${name === selectedName ? 'selected' : ''}>${name}</option>`;
+            }).join('');
+        }
+
+        // Render recursive Active Menu tree
+        function renderMenuTree() {
+            const container = document.getElementById('menu-tree');
+            container.innerHTML = '';
+
+            configData.active_menu.forEach(item => {
+                const el = createTreeItemNode(item);
+                container.appendChild(el);
+            });
+
+            initSortableOnList(container);
+        }
+
+        function initSortableOnList(el) {
+            new Sortable(el, {
+                group: 'nested-menu',
+                animation: 150,
+                fallbackOnBody: true,
+                swapThreshold: 0.65,
+                handle: '.tree-item-title',
+                onEnd: function(evt) {
+                    saveAndSyncMenu();
+                }
+            });
+        }
+
+        // Create DOM nodes for menu tree
+        function createTreeItemNode(item) {
+            const div = document.createElement('div');
+            div.className = 'tree-item';
+            div.dataset.id = item.id;
+            div.dataset.label = item.label || "";
+
+            const isFolder = 'submenu' in item;
+            const badgeType = isFolder ? 'badge-folder' : 'badge-action';
+            const badgeText = isFolder ? 'FOLDER' : 'ACTION';
+
+            div.innerHTML = `
+                <div class="tree-item-header">
+                    <div class="tree-item-title">
+                        <svg class="svg-icon text-accent" width="16" height="16" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                        <span>${escapeHtml(item.label || item.id)}</span>
+                        <span class="item-badge ${badgeType}">${badgeText}</span>
+                    </div>
+                </div>
+                <div class="tree-item-sublist ${isFolder ? '' : 'invisible'}"></div>
+            `;
+
+            // Left Click listener for inspecting
+            div.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Always pass the DOM node, and inspectMenuItem will read the current dataset.id
+                inspectMenuItem({}, div);
+            });
+
+            // Right Click listener for Context Menu
+            div.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Find the live item by current dataset.id
+                const liveItem = findMenuItemDeep(configData.active_menu, div.dataset.id) || item;
+                showContextMenu(e, liveItem, div);
+            });
+
+            // If it is a folder, populate submenu
+            if (isFolder) {
+                const sublist = div.querySelector('.tree-item-sublist');
+                if (item.submenu) {
+                    item.submenu.forEach(subItem => {
+                        sublist.appendChild(createTreeItemNode(subItem));
+                    });
+                }
+                initSortableOnList(sublist);
+            }
+
+            return div;
+        }
+
+        // Context Menu Handler
+        function showContextMenu(e, item, node) {
+            contextMenuTarget = { item, node };
+            const menu = document.getElementById('custom-context-menu');
+            menu.innerHTML = '';
+
+            const isFolder = 'submenu' in item;
+
+            // 1. Add Sibling Action
+            const addActionSibling = document.createElement('button');
+            addActionSibling.className = 'context-menu-item';
+            addActionSibling.innerHTML = '<span>+ Add Sibling Action</span>';
+            addActionSibling.onclick = () => addSiblingItem(item, node, 'action');
+            menu.appendChild(addActionSibling);
+
+            // 2. Add Sibling Folder
+            const addFolderSibling = document.createElement('button');
+            addFolderSibling.className = 'context-menu-item';
+            addFolderSibling.innerHTML = '<span>+ Add Sibling Folder</span>';
+            addFolderSibling.onclick = () => addSiblingItem(item, node, 'folder');
+            menu.appendChild(addFolderSibling);
+
+            const sep1 = document.createElement('div');
+            sep1.className = 'context-menu-separator';
+            menu.appendChild(sep1);
+
+            // 3. Child operations for folders
+            if (isFolder) {
+                const addChildAction = document.createElement('button');
+                addChildAction.className = 'context-menu-item';
+                addChildAction.innerHTML = '<span>+ Add Child Action</span>';
+                addChildAction.onclick = () => addChildItem(item, node, 'action');
+                menu.appendChild(addChildAction);
+
+                const addChildFolder = document.createElement('button');
+                addChildFolder.className = 'context-menu-item';
+                addChildFolder.innerHTML = '<span>+ Add Child Folder</span>';
+                addChildFolder.onclick = () => addChildItem(item, node, 'folder');
+                menu.appendChild(addChildFolder);
+
+                const sep2 = document.createElement('div');
+                sep2.className = 'context-menu-separator';
+                menu.appendChild(sep2);
+
+                const convertAction = document.createElement('button');
+                convertAction.className = 'context-menu-item';
+                convertAction.innerHTML = '<span>Convert to Action</span>';
+                convertAction.onclick = () => contextConvertType('action');
+                menu.appendChild(convertAction);
+            } else {
+                const convertFolder = document.createElement('button');
+                convertFolder.className = 'context-menu-item';
+                convertFolder.innerHTML = '<span>Convert to Folder</span>';
+                convertFolder.onclick = () => contextConvertType('folder');
+                menu.appendChild(convertFolder);
+            }
+
+            const sep3 = document.createElement('div');
+            sep3.className = 'context-menu-separator';
+            menu.appendChild(sep3);
+
+            // 4. Delete option
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'context-menu-item';
+            deleteBtn.style.color = 'var(--accent-red)';
+            deleteBtn.innerHTML = '<span>Delete</span>';
+            deleteBtn.onclick = () => contextDeleteItem(item, node);
+            menu.appendChild(deleteBtn);
+
+            menu.style.display = 'flex';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+        }
+
+        function hideContextMenu() {
+            document.getElementById('custom-context-menu').style.display = 'none';
+        }
+
+        function addSiblingItem(item, node, type) {
+            const childId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const childItem = {
+                id: childId,
+                label: type === 'folder' ? 'New Folder' : 'New Action Item'
+            };
+            if (type === 'folder') childItem.submenu = [];
+            else childItem.sequence = [];
+
+            const newNode = createTreeItemNode(childItem);
+            node.parentNode.insertBefore(newNode, node.nextSibling);
+
+            saveAndSyncMenu();
+            const liveChildItem = findMenuItemDeep(configData.active_menu, childId);
+            inspectMenuItem({}, newNode);
+            hideContextMenu();
+        }
+
+        function addChildItem(item, node, type) {
+            const sublistNode = node.querySelector('.tree-item-sublist');
+            const childId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const childItem = {
+                id: childId,
+                label: type === 'folder' ? 'New Folder' : 'New Action Item'
+            };
+            if (type === 'folder') childItem.submenu = [];
+            else childItem.sequence = [];
+
+            // Add to data structure FIRST
+            if (!item.submenu) item.submenu = [];
+            item.submenu.push(childItem);
+
+            const childNode = createTreeItemNode(childItem);
+            sublistNode.appendChild(childNode);
+            sublistNode.classList.remove('invisible');
+
+            saveAndSyncMenu();
+            const liveChildItem = findMenuItemDeep(configData.active_menu, childId);
+            inspectMenuItem({}, childNode);
+            hideContextMenu();
+        }
+
+        function contextConvertType(type) {
+            if (!contextMenuTarget) return;
+            inspectMenuItem({}, contextMenuTarget.node);
+            toggleItemType(type);
+            hideContextMenu();
+        }
+
+        function contextDeleteItem(item, node) {
+            if (!confirm('Are you sure you want to delete this menu item?')) return;
+
+            if (selectedItemRef && selectedItemRef.node === node) {
+                selectedItemRef = null;
+                document.getElementById('inspector-content').classList.remove('invisible');
+                document.getElementById('inspector-edit-panel').classList.add('invisible');
+            }
+
+            node.remove();
+            saveAndSyncMenu();
+            hideContextMenu();
+        }
+
+        // Serializer to convert DOM state back to configData object
+        function serializeMenuTree(listEl) {
+            const list = [];
+            const items = listEl.children;
+            for (let i = 0; i < items.length; i++) {
+                const el = items[i];
+                if (!el.classList.contains('tree-item')) continue;
+
+                const id = el.dataset.id;
+                let label = el.dataset.label;
+                let sourceItem = findMenuItemDeep(configData.active_menu, id);
+
+                // If this is the currently selected item, use its label from selectedItemRef
+                if (selectedItemRef && selectedItemRef.item.id === id) {
+                    label = selectedItemRef.item.label || "";
+                }
+
+                const item = {
+                    id: id,
+                    label: label
+                };
+
+                const sublistEl = el.querySelector('.tree-item-sublist');
+                if (!sublistEl.classList.contains('invisible')) {
+                    item.submenu = serializeMenuTree(sublistEl);
+                    if (sourceItem && sourceItem.sequence) {
+                        item.sequence = sourceItem.sequence;
+                    }
+                } else {
+                    item.sequence = (sourceItem && sourceItem.sequence) || [];
+                }
+                list.push(item);
+            }
+            return list;
+        }
+
+        // Find item helper
+        function findMenuItemDeep(menu, id) {
+            for (let item of menu) {
+                if (item.id === id) return item;
+                if (item.submenu) {
+                    const found = findMenuItemDeep(item.submenu, id);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+
+        // Add root item button
+        function addRootMenuItem(type) {
+            const newId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const newItem = {
+                id: newId,
+                label: type === 'folder' ? 'New Folder' : 'New Action Item'
+            };
+            if (type === 'folder') {
+                newItem.submenu = [];
+            } else {
+                newItem.sequence = [];
+            }
+            configData.active_menu.push(newItem);
+            renderMenuTree();
+            inspectMenuItem({}, document.querySelector(`[data-id="${newId}"]`));
+        }
+
+        // Inspecting and Editing items
+        function inspectMenuItem(item, domNode) {
+            // Always prefer DOM dataset.id as source of truth (it's updated when ID changes)
+            // Fall back to item.id only if dataset.id is not available
+            const itemId = domNode.dataset.id || item.id;
+
+            if (!itemId) {
+                console.error('Cannot inspect item: no ID found in DOM or item object');
+                return;
+            }
+
+            const liveItem = findMenuItemDeep(configData.active_menu, itemId);
+
+            if (!liveItem) {
+                console.error(`Cannot find item with ID "${itemId}" in configData.active_menu`);
+                return;
+            }
+
+            // Use live item if found, otherwise fall back to passed item
+            selectedItemRef = { item: liveItem, node: domNode };
+
+            document.getElementById('inspector-content').classList.add('invisible');
+            document.getElementById('inspector-edit-panel').classList.remove('invisible');
+
+            const currentItem = liveItem;
+
+            // Fill in the inspector fields with current values
+            document.getElementById('inspect-id').value = currentItem.id;
+            document.getElementById('inspect-label').value = currentItem.label || "";
+
+            const isFolder = 'submenu' in currentItem;
+            document.getElementById('inspect-type-action').checked = !isFolder;
+            document.getElementById('inspect-type-folder').checked = isFolder;
+
+            const folderActionsPanel = document.getElementById('inspect-folder-actions-panel');
+            if (isFolder) {
+                folderActionsPanel.classList.remove('invisible');
+            } else {
+                folderActionsPanel.classList.add('invisible');
+            }
+
+            // Show hint for folders with sequence
+            const sequenceHint = document.getElementById('inspect-sequence-hint');
+            if (isFolder && currentItem.sequence && currentItem.sequence.length > 0) {
+                sequenceHint.style.display = 'block';
+            } else {
+                sequenceHint.style.display = 'none';
+            }
+
+            renderInspectorSequence();
+
+            // Log for debugging
+            console.log(`Inspecting: ID="${currentItem.id}", Label="${currentItem.label || '(empty)'}"`);
+        }
+
+        function updateInspectedItem(field, val) {
+            if (!selectedItemRef) return;
+
+            selectedItemRef.item[field] = val;
+            selectedItemRef.node.dataset[field] = val;
+
+            // Update Title DOM immediately for label changes
+            if (field === 'label') {
+                const titleSpan = selectedItemRef.node.querySelector('.tree-item-title span');
+                if (titleSpan) {
+                    // Show label if provided, otherwise show ID
+                    titleSpan.textContent = escapeHtml(val || selectedItemRef.item.id);
+                }
+                // Ensure dataset.label is in sync
+                selectedItemRef.node.dataset.label = val || "";
+            }
+
+            // Sync menu data structure on any edit
+            saveAndSyncMenu();
+        }
+
+        function updateInspectedItemId(newId) {
+            if (!selectedItemRef) return;
+
+            const oldId = selectedItemRef.item.id;
+            const trimmed = newId.trim();
+
+            // Convert to lowercase and replace spaces with underscores
+            let sanitized = trimmed.replace(/\s+/g, '_').toLowerCase();
+
+            // Remove all characters except alphanumeric and underscore
+            const cleanedId = sanitized.replace(/[^a-z0-9_]/g, '');
+
+            // If characters were removed, notify user
+            if (cleanedId !== sanitized) {
+                alert(`⚠️ Invalid characters detected and removed.\n\nAllowed: letters (a-z), numbers (0-9), underscore (_)\nProhibited: hyphens (-), dots (.), and special characters\n\nConverted to: ${cleanedId}`);
+            }
+
+            sanitized = cleanedId;
+
+            // If unchanged, do nothing
+            if (sanitized === oldId) {
+                document.getElementById('inspect-id').value = oldId;
+                return;
+            }
+
+            // Check for empty ID
+            if (!sanitized) {
+                alert('❌ Item ID cannot be empty!');
+                document.getElementById('inspect-id').value = oldId;
+                return;
+            }
+
+            // Check uniqueness
+            const existingItem = findMenuItemDeep(configData.active_menu, sanitized);
+            if (existingItem && existingItem !== selectedItemRef.item) {
+                alert(`❌ Item ID "${sanitized}" already exists!\n\nEach menu item must have a unique ID.`);
+                document.getElementById('inspect-id').value = oldId;
+                return;
+            }
+
+            // Update ID in data and DOM
+            selectedItemRef.item.id = sanitized;
+            selectedItemRef.node.dataset.id = sanitized;
+            document.getElementById('inspect-id').value = sanitized;
+
+            // Update Title DOM - show label if available, otherwise show new ID
+            const titleSpan = selectedItemRef.node.querySelector('.tree-item-title span');
+            if (titleSpan) {
+                const label = selectedItemRef.item.label || sanitized;
+                titleSpan.textContent = escapeHtml(label);
+            }
+
+            // Update dataset.label to match current label
+            selectedItemRef.node.dataset.label = selectedItemRef.item.label || "";
+
+            // Sync menu data structure
+            saveAndSyncMenu();
+
+            // Visual feedback that change was accepted
+            console.log(`✓ Item ID updated: ${oldId} → ${sanitized}`);
+        }
+
+        // Add child item inside currently inspected Folder
+        function addChildToInspectedFolder(type) {
+            if (!selectedItemRef) return;
+
+            // Ensure we use the live reference
+            const parentItem = selectedItemRef.item;
+            if (!('submenu' in parentItem)) return;
+
+            const parentId = parentItem.id;
+            const childId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const childItem = {
+                id: childId,
+                label: type === 'folder' ? 'New Subfolder' : 'New Sub-item'
+            };
+            if (type === 'folder') {
+                childItem.submenu = [];
+            } else {
+                childItem.sequence = [];
+            }
+
+            parentItem.submenu.push(childItem);
+
+            // Re-render DOM - this will recreate all nodes
+            renderMenuTree();
+
+            // Find the newly created child node in the refreshed DOM
+            const childNode = document.querySelector(`[data-id="${childId}"]`);
+            if (childNode) {
+                // Update selectedItemRef to point to the live parent item from configData
+                const liveParentItem = findMenuItemDeep(configData.active_menu, parentId);
+                const liveParentNode = document.querySelector(`[data-id="${parentId}"]`);
+
+                if (liveParentItem && liveParentNode) {
+                    selectedItemRef.item = liveParentItem;
+                    selectedItemRef.node = liveParentNode;
+                }
+
+                // Find the live child item and inspect it
+                const liveChildItem = findMenuItemDeep(configData.active_menu, childId);
+                inspectMenuItem({}, childNode);
+            }
+        }
+
+        function toggleItemType(type) {
+            if (!selectedItemRef) return;
+            const item = selectedItemRef.item;
+            const sublistNode = selectedItemRef.node.querySelector('.tree-item-sublist');
+            const titleBadge = selectedItemRef.node.querySelector('.item-badge');
+            const folderActionsPanel = document.getElementById('inspect-folder-actions-panel');
+
+            if (type === 'folder') {
+                if (!('submenu' in item)) {
+                    item.submenu = [];
+                }
+                sublistNode.classList.remove('invisible');
+                folderActionsPanel.classList.remove('invisible');
+                titleBadge.className = 'item-badge badge-folder';
+                titleBadge.textContent = 'FOLDER';
+                initSortableOnList(sublistNode);
+            } else {
+                if ('submenu' in item) {
+                    if (item.submenu.length > 0 && !confirm('All submenus in this folder will be deleted. Continue?')) {
+                        document.getElementById('inspect-type-folder').checked = true;
+                        return;
+                    }
+                    delete item.submenu;
+                }
+                sublistNode.classList.add('invisible');
+                folderActionsPanel.classList.add('invisible');
+                titleBadge.className = 'item-badge badge-action';
+                titleBadge.textContent = 'ACTION';
+            }
+
+            saveAndSyncMenu();
+            inspectMenuItem({}, selectedItemRef.node);
+        }
+
+        // Edit sequence of action / folder
+        function renderInspectorSequence() {
+            const list = document.getElementById('inspect-sequence-list');
+            list.innerHTML = '';
+
+            const item = selectedItemRef.item;
+            if (!item.sequence) {
+                item.sequence = [];
+            }
+
+            // Update hint visibility for folders
+            const isFolder = 'submenu' in item;
+            const sequenceHint = document.getElementById('inspect-sequence-hint');
+            if (isFolder && item.sequence.length > 0) {
+                sequenceHint.style.display = 'block';
+            } else {
+                sequenceHint.style.display = 'none';
+            }
+
+            if (item.sequence.length === 0) {
+                list.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:6px;">No scenarios bound</div>`;
+                return;
+            }
+
+            item.sequence.forEach((entry, idx) => {
+                const scenarioName = typeof entry === 'string' ? entry : (entry.scenario || "");
+                const displayName = typeof entry === 'string' ? entry : (entry.name || scenarioName);
+
+                const div = document.createElement('div');
+                div.style.display = 'grid';
+                div.style.gridTemplateColumns = '1fr 1fr auto';
+                div.style.gap = '8px';
+                div.style.alignItems = 'center';
+                div.innerHTML = `
+                    <select onchange="updateSequenceEntryScenario(${idx}, this.value)" onkeydown="if(event.key==='Enter') this.blur();">
+                        ${getScenariosOptions(scenarioName)}
+                    </select>
+                    <input type="text" value="${escapeHtml(displayName)}" placeholder="Display Name" onchange="updateSequenceEntryName(${idx}, this.value)" onkeydown="if(event.key==='Enter') { updateSequenceEntryName(${idx}, this.value); this.blur(); }">
+                    <button class="step-delete-btn" onclick="deleteSequenceEntry(${idx})">&times;</button>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function addSequenceEntry() {
+            if (!selectedItemRef) return;
+            const item = selectedItemRef.item;
+
+            const firstScenario = Object.keys(configData.scenarios)[0] || "scenario_test_nested";
+            if (!configData.scenarios[firstScenario]) {
+                configData.scenarios[firstScenario] = [];
+            }
+
+            if (!item.sequence) item.sequence = [];
+            item.sequence.push({ scenario: firstScenario, name: "Run" });
+            renderInspectorSequence();
+            saveAndSyncMenu();
+            renderPassiveTriggers();
+        }
+
+        function updateSequenceEntryScenario(idx, scenarioVal) {
+            const entry = selectedItemRef.item.sequence[idx];
+            if (typeof entry === 'string') {
+                selectedItemRef.item.sequence[idx] = scenarioVal;
+            } else {
+                entry.scenario = scenarioVal;
+            }
+            saveAndSyncMenu();
+        }
+
+        function updateSequenceEntryName(idx, nameVal) {
+            const entry = selectedItemRef.item.sequence[idx];
+            if (typeof entry === 'string') {
+                selectedItemRef.item.sequence[idx] = { scenario: entry, name: nameVal };
+            } else {
+                entry.name = nameVal;
+            }
+            saveAndSyncMenu();
+        }
+
+        function deleteSequenceEntry(idx) {
+            selectedItemRef.item.sequence.splice(idx, 1);
+            renderInspectorSequence();
+            saveAndSyncMenu();
+        }
+
+        function deleteInspectedItem() {
+            if (!selectedItemRef) return;
+            if (!confirm('Are you sure you want to delete this menu item?')) return;
+
+            selectedItemRef.node.remove();
+            selectedItemRef = null;
+
+            document.getElementById('inspector-content').classList.remove('invisible');
+            document.getElementById('inspector-edit-panel').classList.add('invisible');
+
+            saveAndSyncMenu();
+        }
+
+        // ============================================
+        // SCENARIO EDITOR LOGIC
+        // ============================================
+
+        function filterScenariosList(query) {
+            scenarioFilterQuery = query.toLowerCase().trim();
+            renderScenariosList();
+        }
+
+        function renderScenariosList() {
+            const list = document.getElementById('scenarios-list');
+            list.innerHTML = '';
+
+            Object.keys(configData.scenarios).forEach(name => {
+                if (scenarioFilterQuery && !name.toLowerCase().includes(scenarioFilterQuery)) {
+                    return;
+                }
+
+                const btn = document.createElement('button');
+                btn.className = `scenario-option ${name === activeScenarioName ? 'active' : ''}`;
+                btn.dataset.name = name; // Store name in DOM for safety
+                btn.innerHTML = `
+                    <span>${escapeHtml(name)}</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted)">(${configData.scenarios[name].length})</span>
+                `;
+                btn.onclick = function() {
+                    // Read name from DOM dataset instead of closure
+                    selectScenario(this.dataset.name);
+                };
+
+                // Right-click context menu for scenarios
+                btn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Read name from DOM dataset
+                    showScenarioContextMenu(e, e.currentTarget.dataset.name);
+                });
+
+                list.appendChild(btn);
+            });
+        }
+
+        function selectScenario(name) {
+            activeScenarioName = name;
+            renderScenariosList();
+            updateScenarioEditor();
+        }
+
+        function showScenarioContextMenu(e, scenarioName) {
+            const menu = document.getElementById('custom-context-menu');
+            menu.innerHTML = '';
+
+            // 1. Rename scenario
+            const renameBtn = document.createElement('button');
+            renameBtn.className = 'context-menu-item';
+            renameBtn.innerHTML = '<span>✏️ Rename Scenario</span>';
+            renameBtn.onclick = () => {
+                const newName = prompt('Enter new scenario name:', scenarioName);
+                if (newName && newName.trim()) {
+                    renameScenarioFromContext(scenarioName, newName.trim());
+                }
+                hideContextMenu();
+            };
+            menu.appendChild(renameBtn);
+
+            // 2. Duplicate scenario
+            const duplicateBtn = document.createElement('button');
+            duplicateBtn.className = 'context-menu-item';
+            duplicateBtn.innerHTML = '<span>📋 Duplicate Scenario</span>';
+            duplicateBtn.onclick = () => {
+                duplicateScenarioFromContext(scenarioName);
+                hideContextMenu();
+            };
+            menu.appendChild(duplicateBtn);
+
+            // 3. Clear all steps
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'context-menu-item';
+            clearBtn.innerHTML = '<span>🗑️ Clear All Steps</span>';
+            clearBtn.onclick = () => {
+                if (confirm(`Clear all steps from scenario "${scenarioName}"?`)) {
+                    configData.scenarios[scenarioName] = [];
+                    if (activeScenarioName === scenarioName) {
+                        updateScenarioEditor();
+                    }
+                    renderScenariosList();
+                }
+                hideContextMenu();
+            };
+            menu.appendChild(clearBtn);
+
+            const sep = document.createElement('div');
+            sep.className = 'context-menu-separator';
+            menu.appendChild(sep);
+
+            // 4. Delete scenario
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'context-menu-item';
+            deleteBtn.style.color = 'var(--accent-red)';
+            deleteBtn.innerHTML = '<span>❌ Delete Scenario</span>';
+            deleteBtn.onclick = () => {
+                deleteScenarioFromContext(scenarioName);
+                hideContextMenu();
+            };
+            menu.appendChild(deleteBtn);
+
+            menu.style.display = 'flex';
+            menu.style.left = `${e.clientX}px`;
+            menu.style.top = `${e.clientY}px`;
+        }
+
+        function renameScenarioFromContext(oldName, newName) {
+            const sanitized = newName.toLowerCase().replace(/\s+/g, '_');
+
+            if (sanitized === oldName) return;
+
+            if (configData.scenarios[sanitized]) {
+                alert('Scenario with this name already exists!');
+                return;
+            }
+
+            // Copy scenario data
+            configData.scenarios[sanitized] = configData.scenarios[oldName];
+            delete configData.scenarios[oldName];
+
+            // Update references in passive triggers
+            Object.keys(configData.passive).forEach(key => {
+                if (configData.passive[key] === oldName) {
+                    configData.passive[key] = sanitized;
+                }
+            });
+
+            // Update references in menu sequences
+            function updateRefs(items) {
+                items.forEach(item => {
+                    if (item.sequence) {
+                        item.sequence.forEach(step => {
+                            if (step.scenario === oldName) {
+                                step.scenario = sanitized;
+                            }
+                        });
+                    }
+                    if (item.submenu) updateRefs(item.submenu);
+                });
+            }
+            updateRefs(configData.active_menu);
+
+            // Update active scenario if needed
+            if (activeScenarioName === oldName) {
+                activeScenarioName = sanitized;
+                updateScenarioEditor();
+            }
+
+            renderScenariosList();
+            renderPassiveTriggers();
+            if (selectedItemRef) renderInspectorSequence();
+        }
+
+        function duplicateScenarioFromContext(scenarioName) {
+            let copyName = scenarioName + '_copy';
+            let counter = 1;
+
+            // Find unique name
+            while (configData.scenarios[copyName]) {
+                copyName = scenarioName + '_copy' + counter;
+                counter++;
+            }
+
+            // Deep copy the scenario steps
+            configData.scenarios[copyName] = JSON.parse(JSON.stringify(configData.scenarios[scenarioName]));
+
+            activeScenarioName = copyName;
+            renderScenariosList();
+            updateScenarioEditor();
+        }
+
+        function deleteScenarioFromContext(scenarioName) {
+            if (!confirm(`Are you sure you want to delete scenario "${scenarioName}"?\n\nThis cannot be undone.`)) {
+                return;
+            }
+
+            delete configData.scenarios[scenarioName];
+
+            // Clear references in passive triggers
+            Object.keys(configData.passive).forEach(key => {
+                if (configData.passive[key] === scenarioName) {
+                    delete configData.passive[key];
+                }
+            });
+
+            // Clear references in menu sequences
+            function clearRefs(items) {
+                items.forEach(item => {
+                    if (item.sequence) {
+                        item.sequence = item.sequence.filter(step => step.scenario !== scenarioName);
+                    }
+                    if (item.submenu) clearRefs(item.submenu);
+                });
+            }
+            clearRefs(configData.active_menu);
+
+            // Deselect if it was active
+            if (activeScenarioName === scenarioName) {
+                activeScenarioName = null;
+                updateScenarioEditor();
+            }
+
+            renderScenariosList();
+            renderPassiveTriggers();
+            if (selectedItemRef) renderInspectorSequence();
+        }
+
+        function updateScenarioEditor() {
+            const empty = document.getElementById('scenario-empty');
+            const stepsContainer = document.getElementById('scenario-steps-container');
+            const title = document.getElementById('current-scenario-title');
+
+            if (!activeScenarioName) {
+                empty.classList.remove('invisible');
+                stepsContainer.classList.add('invisible');
+                title.textContent = 'Select scenario...';
+                return;
+            }
+
+            empty.classList.add('invisible');
+            stepsContainer.classList.remove('invisible');
+
+            // Make title editable - use onblur instead of onchange for better UX
+            const escapedName = activeScenarioName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            title.innerHTML = `<input type="text" value="${escapedName}"
+                style="background: transparent; border: 1px solid var(--border); border-radius: 6px;
+                padding: 4px 8px; color: var(--text-main); font-family: var(--font-mono); font-size: 1rem;
+                width: 100%;"
+                onblur="renameActiveScenario(this.value)"
+                onkeydown="if(event.key==='Enter') this.blur();" />`;
+
+            renderScenarioSteps();
+        }
+
+        function addNewScenario() {
+            const name = prompt("Enter new scenario ID (e.g. scenario_deploy):");
+            if (!name) return;
+
+            const sanitized = name.trim().toLowerCase().replace(/\s+/g, '_');
+            if (configData.scenarios[sanitized]) {
+                alert("Scenario with this ID already exists!");
+                return;
+            }
+
+            configData.scenarios[sanitized] = [];
+            activeScenarioName = sanitized;
+
+            renderScenariosList();
+            updateScenarioEditor();
+            renderPassiveTriggers();
+            if (selectedItemRef) renderInspectorSequence();
+        }
+
+        function renameActiveScenario(newName) {
+            if (!activeScenarioName) return;
+
+            const sanitized = newName.trim().toLowerCase().replace(/\s+/g, '_');
+
+            // Check if name is empty or unchanged - don't re-render if unchanged!
+            if (!sanitized) {
+                updateScenarioEditor();
+                return;
+            }
+
+            if (sanitized === activeScenarioName) {
+                // Name unchanged - do nothing, don't re-render
+                return;
+            }
+
+            // Check if new name already exists
+            if (configData.scenarios[sanitized]) {
+                alert("Scenario with this ID already exists!");
+                updateScenarioEditor();
+                return;
+            }
+
+            // Rename: copy data to new key and delete old key
+            configData.scenarios[sanitized] = configData.scenarios[activeScenarioName];
+            delete configData.scenarios[activeScenarioName];
+
+            // Update passive triggers that reference the old name
+            Object.keys(configData.passive).forEach(key => {
+                if (configData.passive[key] === activeScenarioName) {
+                    configData.passive[key] = sanitized;
+                }
+            });
+
+            // Update menu items that reference the old name in their sequences
+            function updateSequenceRefs(menuItems) {
+                menuItems.forEach(item => {
+                    if (item.sequence) {
+                        item.sequence.forEach(step => {
+                            if (step.type === 'scenario' && step.scenario === activeScenarioName) {
+                                step.scenario = sanitized;
+                            }
+                        });
+                    }
+                    if (item.submenu) {
+                        updateSequenceRefs(item.submenu);
+                    }
+                });
+            }
+            updateSequenceRefs(configData.active_menu);
+
+            // Update active scenario name
+            activeScenarioName = sanitized;
+
+            renderScenariosList();
+            updateScenarioEditor();
+            renderPassiveTriggers();
+            if (selectedItemRef) renderInspectorSequence();
+        }
+
+        function deleteActiveScenario() {
+            if (!activeScenarioName) return;
+            if (!confirm(`Are you sure you want to delete scenario: ${activeScenarioName}?`)) return;
+
+            delete configData.scenarios[activeScenarioName];
+            activeScenarioName = null;
+
+            renderScenariosList();
+            updateScenarioEditor();
+            renderPassiveTriggers();
+            if (selectedItemRef) renderInspectorSequence();
+        }
+
+        function renderScenarioSteps() {
+            const container = document.getElementById('scenario-steps-list');
+            container.innerHTML = '';
+
+            const steps = configData.scenarios[activeScenarioName] || [];
+
+            if (steps.length === 0) {
+                container.innerHTML = `<div class="empty-placeholder" style="padding: 2rem; border-style:dashed;">Click or drag steps here to build sequence</div>`;
+            } else {
+                steps.forEach((step, idx) => {
+                    container.appendChild(createStepCardNode(step, idx));
+                });
+            }
+
+            new Sortable(container, {
+                group: 'scenario-steps',
+                animation: 100,
+                onEnd: function(evt) {
+                    saveActiveScenarioSteps();
+                }
+            });
+        }
+
+        function createStepCardNode(step, idx) {
+            const card = document.createElement('div');
+            card.className = 'step-card';
+            card.dataset.idx = idx;
+            card.tabIndex = 0; // Make card focusable
+
+            // Create step type label
+            const typeDiv = document.createElement('div');
+            typeDiv.className = `step-type type-${step.action}`;
+            typeDiv.textContent = step.action;
+
+            // Create fields container
+            const fieldsDiv = document.createElement('div');
+            fieldsDiv.className = 'step-fields';
+
+            // Create input field based on step type
+            if (step.action === 'type') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = step.value || '';
+                input.placeholder = 'Text to type';
+                input.oninput = function() { updateStepValue(idx, 'value', this.value); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'value', this.value);
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            } else if (step.action === 'key') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = step.combo || '';
+                input.placeholder = 'ctrl+alt+t, super+l, etc';
+                input.oninput = function() { updateStepValue(idx, 'combo', this.value); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'combo', this.value);
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            } else if (step.action === 'wait') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.value = step.ms || 0;
+                input.placeholder = 'milliseconds';
+                input.oninput = function() { updateStepValue(idx, 'ms', parseInt(this.value)); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'ms', parseInt(this.value));
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            } else if (step.action === 'enter') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.value = step.count || 1;
+                input.placeholder = 'press count';
+                input.oninput = function() { updateStepValue(idx, 'count', parseInt(this.value)); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'count', parseInt(this.value));
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            }
+
+            // Create delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'step-delete-btn';
+            deleteBtn.textContent = '×';
+            deleteBtn.title = 'Delete step (or press Ctrl+Delete)';
+            deleteBtn.onclick = function() { 
+                if (confirm('Delete this step?')) {
+                    deleteStep(idx); 
+                }
+            };
+
+            // Add keyboard shortcut for deleting step
+            card.addEventListener('keydown', function(event) {
+                if ((event.key === 'Delete' || event.key === 'Backspace') && event.ctrlKey) {
+                    event.preventDefault();
+                    if (confirm('Delete this step?')) {
+                        deleteStep(idx);
+                    }
+                }
+            });
+
+            // Assemble the card
+            card.appendChild(typeDiv);
+            card.appendChild(fieldsDiv);
+            card.appendChild(deleteBtn);
+
+            return card;
+        }
+
+        let draggedStepType = null;
+        function handleStepDragStart(event) {
+            draggedStepType = event.target.dataset.type;
+        }
+
+        const stepsListEl = document.getElementById('scenario-steps-list');
+        stepsListEl.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        stepsListEl.addEventListener('drop', (e) => {
+            if (!draggedStepType || !activeScenarioName) return;
+            e.preventDefault();
+
+            let newStep = { action: draggedStepType };
+            if (draggedStepType === 'type') newStep.value = '';
+            else if (draggedStepType === 'key') newStep.combo = '';
+            else if (draggedStepType === 'wait') newStep.ms = 500;
+            else if (draggedStepType === 'enter') newStep.count = 1;
+
+            configData.scenarios[activeScenarioName].push(newStep);
+            draggedStepType = null;
+            renderScenarioSteps();
+        });
+
+        function handleToolboxClick(type) {
+            if (!activeScenarioName) return;
+
+            let newStep = { action: type };
+            if (type === 'type') newStep.value = '';
+            else if (type === 'key') newStep.combo = '';
+            else if (type === 'wait') newStep.ms = 500;
+            else if (type === 'enter') newStep.count = 1;
+
+            configData.scenarios[activeScenarioName].push(newStep);
+            renderScenarioSteps();
+        }
+
+        function deleteStep(idx) {
+            if (!activeScenarioName) return;
+            configData.scenarios[activeScenarioName].splice(idx, 1);
+            renderScenarioSteps();
+        }
+
+        function updateStepValue(idx, field, val) {
+            if (!activeScenarioName) return;
+
+            // Basic validation to prevent common errors
+            if (field === 'value' && (!val || val.trim() === '')) {
+                console.warn('⚠️ Step has empty text value - command will do nothing');
+            }
+            if (field === 'combo' && (!val || val.trim() === '')) {
+                console.warn('⚠️ Step has empty key combo - command will do nothing');
+            }
+            if (field === 'ms' && (isNaN(val) || val < 0)) {
+                console.warn('⚠️ Invalid wait time, setting to 0');
+                val = 0;
+            }
+            if (field === 'count' && (isNaN(val) || val < 1)) {
+                console.warn('⚠️ Invalid enter count, setting to 1');
+                val = 1;
+            }
+
+            configData.scenarios[activeScenarioName][idx][field] = val;
+        }
+
+        function saveActiveScenarioSteps() {
+            if (!activeScenarioName) return;
+            const container = document.getElementById('scenario-steps-list');
+            const cards = container.children;
+            const reordered = [];
+
+            for (let i = 0; i < cards.length; i++) {
+                const card = cards[i];
+                if (!card.classList.contains('step-card')) continue;
+
+                const oldIdx = parseInt(card.dataset.idx);
+                reordered.push(configData.scenarios[activeScenarioName][oldIdx]);
+            }
+
+            configData.scenarios[activeScenarioName] = reordered;
+            renderScenarioSteps();
+            renderScenariosList();
+        }
+
+        function escapeHtml(text) {
+            if (typeof text !== 'string') return text;
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

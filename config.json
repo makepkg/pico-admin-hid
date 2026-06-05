@@ -1,0 +1,207 @@
+{
+  "hardware": {
+    "hall_sensors": [
+      {"id": "hall_sensor_1", "pin": 15, "active_low": true},
+      {"id": "hall_sensor_2", "pin": 16, "active_low": true}
+    ],
+    "button_pin": 24,
+    "led_pin":    25,
+    "encoder_clk": 6,
+    "encoder_dt":  7,
+    "encoder_sw":  8,
+    "display_sda": 4,
+    "display_scl": 5
+  },
+
+  "device": {
+    "debounce_ms": 300,
+    "cooldown_ms": 5000,
+    "armed":       true,
+    "screen_timeout_s": 15,
+    "screensaver": "tesseract"
+  },
+
+  "passive": {
+    "hall_sensor_1": "scenario_shutdown",
+    "hall_sensor_2": "scenario_shutdown",
+    "btn_double":    "scenario_lock"
+  },
+
+  "active_menu": [
+    {
+      "id": "test_folder_1",
+      "label": "Folder 1",
+      "submenu": [
+        {
+          "id": "test_folder_2",
+          "label": "Folder 2",
+          "submenu": [
+            {
+              "id": "test_item_3",
+              "label": "Item 3",
+              "sequence": [
+                {"scenario": "scenario_test_nested", "name": "Run Test"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id":    "nextcloud",
+      "label": "Nextcloud",
+      "sequence": [
+        {"scenario": "scenario_nextcloud_stop",  "name": "Stop"},
+        {"scenario": "scenario_nextcloud_start", "name": "Start"}
+      ]
+    },
+    {
+      "id":    "searxng",
+      "label": "SearXNG",
+      "sequence": [
+        {"scenario": "scenario_searxng_stop",  "name": "Stop"},
+        {"scenario": "scenario_searxng_start", "name": "Start"}
+      ]
+    },
+    {
+      "id":    "n8n",
+      "label": "n8n Stack",
+      "sequence": [
+        {"scenario": "scenario_n8n_stop",  "name": "Stop"},
+        {"scenario": "scenario_n8n_start", "name": "Start"}
+      ]
+    },
+    {
+      "id":    "cups",
+      "label": "CUPS Print",
+      "sequence": [
+        {"scenario": "scenario_cups_stop",  "name": "Stop"},
+        {"scenario": "scenario_cups_start", "name": "Start"}
+      ]
+    },
+    {
+      "id":    "dokuwiki",
+      "label": "DokuWiki",
+      "sequence": [
+        {"scenario": "scenario_dokuwiki_stop",  "name": "Stop"},
+        {"scenario": "scenario_dokuwiki_start", "name": "Start"}
+      ]
+    },
+    {
+      "id":    "monitoring",
+      "label": "Monitoring",
+      "sequence": [
+        {"scenario": "scenario_monitoring_stop",  "name": "Stop All"},
+        {"scenario": "scenario_monitoring_start", "name": "Start All"}
+      ]
+    },
+    {
+      "id":    "tududi",
+      "label": "Tududi",
+      "sequence": [
+        {"scenario": "scenario_tududi_stop",  "name": "Stop"},
+        {"scenario": "scenario_tududi_start", "name": "Start"}
+      ]
+    }
+  ],
+
+  "scenarios": {
+    "scenario_test_nested": [
+      {"action": "type", "value": "Nested submenu works!"},
+      {"action": "key", "combo": "enter"}
+    ],
+    "scenario_shutdown": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 1000},
+      {"action": "type",  "value": "safe_shutdown --now"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_lock": [
+      {"action": "key", "combo": "super+l"}
+    ],
+    "scenario_nextcloud_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "sudo systemctl stop cloudflared-nextcloud; cd /opt/nextcloud && docker-compose stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_nextcloud_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/nextcloud && docker-compose start; sudo systemctl start cloudflared-nextcloud"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_searxng_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "sudo systemctl stop cloudflared-searxng; cd /opt/searxng && docker-compose stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_searxng_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/searxng && docker-compose start; sudo systemctl start cloudflared-searxng"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_n8n_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "sudo systemctl stop cloudflared-n8n; cd /opt/n8n && docker-compose stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_n8n_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/n8n && docker-compose start; sudo systemctl start cloudflared-n8n"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_cups_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_cups_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml start"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_dokuwiki_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/dokuwiki && docker-compose stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_dokuwiki_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/dokuwiki && docker-compose start"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_monitoring_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/monitoring && docker-compose stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_monitoring_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/monitoring && docker-compose start"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_tududi_stop": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/tududi && docker-compose stop"},
+      {"action": "key",   "combo": "enter"}
+    ],
+    "scenario_tududi_start": [
+      {"action": "enter", "count": 3},
+      {"action": "wait",  "ms": 200},
+      {"action": "type",  "value": "cd /opt/tududi && docker-compose start"},
+      {"action": "key",   "combo": "enter"}
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+# CircuitPython Settings File Template
+# Copy this file to 'settings.toml' and customize if needed
+
+# USB Device Configuration (optional)
+# CIRCUITPY_USB_MANUFACTURER = "makepkg"
+# CIRCUITPY_USB_PRODUCT = "Pico Commander"
+
+# Note: Raspberry Pi Pico does NOT have WiFi
+# For WiFi support, use Raspberry Pi Pico W variant
