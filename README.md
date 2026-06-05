@@ -42,7 +42,7 @@
 
 </div>
 
-**Full Video Demo**: [Watch on YouTube](#) *(coming soon)*
+**Full Video Demo**: [Watch on YouTube](https://youtu.be/huUQviQJ-Cw)
 
 ---
 
