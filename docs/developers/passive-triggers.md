@@ -6,7 +6,7 @@ Technical documentation for the passive (hardware-driven) trigger system.
 
 ## Overview
 
-The passive trigger system handles asynchronous hardware events from Hall effect sensors and physical buttons. These triggers execute scenarios independently of menu navigation and user interaction.
+The passive trigger system handles asynchronous hardware events from sensors (e.g., Hall effect, INA226 power monitor) and physical buttons. These triggers execute scenarios independently of menu navigation and user interaction.
 
 ### Key Characteristics
 
@@ -21,28 +21,28 @@ The passive trigger system handles asynchronous hardware events from Hall effect
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                    PASSIVE HANDLER                        │
-│                     (passive.py)                          │
+│                    INPUTS MANAGER                         │
+│                  (inputs_manager.py)                      │
 ├──────────────────────────────────────────────────────────┤
 │                                                           │
-│  ┌─────────────────┐         ┌──────────────────┐       │
-│  │  Hall Sensors   │         │  Button          │       │
-│  │  (GPIO inputs)  │         │  (GPIO input)    │       │
-│  └────────┬────────┘         └────────┬─────────┘       │
-│           │                           │                  │
-│           ▼                           ▼                  │
-│  ┌─────────────────┐         ┌──────────────────┐       │
-│  │  Debounce Logic │         │  Double-Click    │       │
-│  │  (300ms default)│         │  Detection       │       │
-│  └────────┬────────┘         └────────┬─────────┘       │
-│           │                           │                  │
-│           └──────────┬────────────────┘                  │
-│                      ▼                                   │
-│           ┌────────────────────┐                         │
-│           │  State Change      │                         │
-│           │  Detection         │                         │
-│           └──────────┬─────────┘                         │
-└──────────────────────┼──────────────────────────────────┘
+│  ┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐ │
+│  │ HallSensorInput │ │PowerMonitorInput│ │ Button       │ │
+│  │ (type: hall)    │ │(type: ina226)   │ │ (GPIO GP24)  │ │
+│  └────────┬────────┘ └────────┬────────┘ └──────┬───────┘ │
+│           │                   │                 │         │
+│           ▼                   ▼                 ▼         │
+│  ┌─────────────────┐ ┌─────────────────┐ ┌──────────────┐ │
+│  │ Debounce Logic  │ │ Threshold Logic │ │ Double-Click │ │
+│  │ (300ms default) │ │ (% or voltage)  │ │ Detection    │ │
+│  └────────┬────────┘ └────────┬────────┘ └──────┬───────┘ │
+│           │                   │                 │         │
+│           └──────────┬────────┴─────────────────┘         │
+│                      ▼                                    │
+│           ┌────────────────────┐                          │
+│           │  State Change      │                          │
+│           │  Detection         │                          │
+│           └──────────┬─────────┘                          │
+└──────────────────────┼────────────────────────────────────┘
                        │
                        ▼
             ┌────────────────────┐
@@ -52,28 +52,30 @@ The passive trigger system handles asynchronous hardware events from Hall effect
                        │
                        ▼
             ┌────────────────────┐
-            │  Scenario Executor │
+            │ execute_pipeline() │
             └────────────────────┘
 ```
+
+*Note: The button is not implemented as a standalone Input class; it is handled directly within `InputsManager._process_button()` due to its special double-click and double-purpose nature.*
 
 ---
 
 ## Hardware Inputs
 
+All typed passive sensors are defined in the `config.json` → `inputs` section. The dictionary key acts as the unique `input_id`.
+
 ### Hall Effect Sensors
 
-**Purpose**: Detect magnetic field proximity (emergency triggers)
+**Purpose**: Detect magnetic field proximity (emergency triggers).
 
 **Configuration**:
 ```json
-"hardware": {
-  "hall_sensors": [
-    {
-      "id": "hall_sensor_1",
-      "pin": 15,
-      "active_low": true
-    }
-  ]
+"inputs": {
+  "hall_sensor_1": {
+    "type": "hall",
+    "pin": 15,
+    "active_low": true
+  }
 }
 ```
 
@@ -85,67 +87,84 @@ The passive trigger system handles asynchronous hardware events from Hall effect
 - Emergency shutdown when case opened
 - Door/drawer close detection
 - Magnetic key/card activation
-- Proximity detection
+
+### INA226 Power Monitor
+
+**Purpose**: I2C battery voltage and current monitoring, triggering on low battery thresholds.
+
+**Configuration**:
+```json
+"inputs": {
+  "ina226": {
+    "type": "power_monitor",
+    "enabled": true,
+    "trigger_mode": "percent",
+    "threshold_percent": 15,
+    "threshold_voltage": 16.5,
+    "warning_offset_percent": 5,
+    "cooldown_sec": 300,
+    "cancel_cooldown_sec": 3600
+  }
+}
+```
+
+**Fields**:
+- `trigger_mode`: `"percent"` or `"voltage"`. Determines which metric triggers the alarm.
+- `threshold_*`: The exact value below which the emergency trigger fires.
+- `warning_offset_percent`: Adds an offset (e.g., `+5`) to the threshold to determine the "warning zone". If the battery enters this zone, a warning screen appears before the actual trigger fires.
+- `cooldown_sec`: Cooldown after the trigger successfully fires.
+- `cancel_cooldown_sec`: Cooldown applied if the user manually cancels the warning via encoder center click.
+
+**Warning Dismissal**:
+- **Cancel**: Encoder center click cancels the trigger and applies `cancel_cooldown_sec`.
+- **Snooze/Dismiss**: Encoder scroll simply hides the warning overlay but keeps the trigger armed (`warning_dismissed` flag). If the battery drops to the critical threshold, it will still fire. The dismiss state is reset only when the battery charges back above the warning zone.
 
 ### Button Input
 
-**Purpose**: Physical button for direct triggers (alternative to encoder)
+**Purpose**: Physical button for direct triggers (alternative to encoder).
 
-**Pin**: GP24 (also used for boot mode selection)
+**Pin**: Defined in `hardware.button_pin` (default GP24, also used for boot mode selection).
 
-**Detection**: Double-click within time window
-
-**Typical Use Cases**:
-- Lock screen (double-click)
-- Quick access to specific scenario
-- Emergency stop/cancel
+**Detection**: Double-click within time window.
 
 ---
 
 ## Trigger Binding
 
-Passive triggers are bound to scenarios in `config.json`:
+Passive triggers are bound to scenarios in the `config.json` → `passive` section using the `pipeline` format:
 
 ```json
 "passive": {
-  "hall_sensor_1": "scenario_shutdown",
-  "hall_sensor_2": "scenario_alarm",
-  "btn_double": "scenario_lock"
+  "hall_sensor_1": {
+    "pipeline": ["scenario_shutdown"],
+    "loop": false
+  },
+  "btn_double": {
+    "pipeline": ["scenario_lock"],
+    "loop": false
+  }
 }
 ```
 
 **Binding Rules**:
-- Key must match sensor ID or `btn_double`
-- Value must be valid scenario name
-- Missing binding = trigger does nothing
-- Invalid scenario name = logged error, no crash
+- The key must match the sensor ID from the `inputs` section (e.g., `hall_sensor_1`) or be `btn_double`.
+- The value is an object containing `pipeline` (array of scenario names) and `loop` (boolean).
+- Missing binding = trigger does nothing.
+
+**Backward Compatibility**:
+The engine (`trigger_bus.py`) still supports the legacy string format:
+```json
+"passive": {
+  "hall_sensor_1": "scenario_shutdown"
+}
+```
+At runtime, `trigger_bus.fire()` automatically converts this string into the modern `{ "pipeline": ["scenario_shutdown"], "loop": false }` format before executing.
 
 ---
 
 ## Debouncing Logic
 
 ### Hall Sensor Debounce
-
-```python
-def _check_hall_sensors(self):
-    now = time.monotonic()
-    
-    for idx, sensor in enumerate(self._hall_sensors):
-        raw_value = sensor.value
-        expected = 0 if sensor_config["active_low"] else 1
-        triggered = (raw_value == expected)
-        
-        # State change detected
-        if triggered != self._last_hall_states[idx]:
-            self._last_hall_times[idx] = now
-            self._last_hall_states[idx] = triggered
-        
-        # Debounce period passed
-        elapsed_ms = (now - self._last_hall_times[idx]) * 1000
-        if elapsed_ms > self._debounce_ms and triggered:
-            if self._armed:
-                trigger_bus.fire(sensor_id, PRIORITY_HIGH)
-```
 
 **Debounce Window**: 300ms default (configurable in `config.json` → `device.debounce_ms`)
 
@@ -158,30 +177,16 @@ def _check_hall_sensors(self):
 
 Built into CircuitPython's `DigitalInOut` when using pull resistors.
 
-**Double-Click Detection**:
-```python
-def _check_button(self):
-    if button_pressed:
-        now = time.monotonic()
-        time_since_last = now - self._btn_last_click
-        
-        if time_since_last < DOUBLE_CLICK_WINDOW:
-            # Second click within window
-            trigger_bus.fire("btn_double", PRIORITY_NORMAL)
-        
-        self._btn_last_click = now
-```
-
-**Double-Click Window**: Typically 500ms
+**Double-Click Window**: Typically 400-500ms
 
 ---
 
 ## Priority System
 
-Passive triggers use **PRIORITY_HIGH** to ensure emergency actions execute immediately:
+Passive sensors typically use **PRIORITY_HIGH** to ensure emergency actions execute immediately:
 
 ```python
-# Hall sensors bypass cooldown
+# Hall sensors and power monitors bypass cooldown
 trigger_bus.fire("hall_sensor_1", PRIORITY_HIGH)
 
 # Button uses normal priority (respects cooldown)
@@ -248,9 +253,9 @@ trigger_bus.fire("btn_double", PRIORITY_NORMAL)
      ┌─────────────┐
      │   WAITING   │─────► Store timestamp
      └──────┬──────┘
-            │ Timeout (>500ms)
+            │ Timeout (>400ms)
             │ OR
-            │ Second press (<500ms)
+            │ Second press (<400ms)
             ▼
      ┌─────────────┐
      │   SINGLE    │────────► Ignore (no binding)
@@ -280,24 +285,8 @@ trigger_bus.fire("btn_double", PRIORITY_NORMAL)
 ```
 
 **armed Flag**:
-- `true` — Hall sensors fire triggers
-- `false` — Hall sensors monitored but don't fire (safety mode)
-
-### Hardware Configuration
-
-```json
-"hardware": {
-  "hall_sensors": [
-    {"id": "hall_sensor_1", "pin": 15, "active_low": true},
-    {"id": "hall_sensor_2", "pin": 16, "active_low": true}
-  ],
-  "button_pin": 24
-}
-```
-
-**Dynamic Sensors**:
-- Add/remove sensors via Config Studio editor
-- Changes require reboot to take effect
+- `true` — Sensors fire triggers
+- `false` — Sensors monitored but don't fire (safety mode)
 
 ---
 
@@ -308,34 +297,20 @@ trigger_bus.fire("btn_double", PRIORITY_NORMAL)
 ```
 1. Magnet approaches hall_sensor_1 (GP15)
 2. Pin state changes: HIGH → LOW (active_low=true)
-3. passive.py detects state change
+3. inputs_manager.py detects state change
 4. Debounce timer starts (300ms)
 5. State remains stable for 300ms
-6. passive.py calls: trigger_bus.fire("hall_sensor_1", PRIORITY_HIGH)
+6. inputs_manager.py calls: trigger_bus.fire("hall_sensor_1", PRIORITY_HIGH)
 7. trigger_bus checks:
    - is_busy? NO → continue
    - cooldown? BYPASSED (HIGH priority) → continue
-8. trigger_bus loads scenario from config.passive["hall_sensor_1"]
-9. Scenario executes: "scenario_shutdown"
-10. HID commands sent to host system
-11. Cooldown applied (for future NORMAL priority triggers)
-```
-
-### Button Double-Click
-
-```
-1. User presses button (GP24)
-2. passive.py records timestamp: t1
-3. User releases button
-4. User presses button again
-5. passive.py calculates: t2 - t1 = 350ms
-6. Double-click detected (< 500ms window)
-7. passive.py calls: trigger_bus.fire("btn_double", PRIORITY_NORMAL)
-8. trigger_bus checks:
-   - is_busy? NO → continue
-   - cooldown? t_elapsed > 5s → continue
-9. Scenario executes: "scenario_lock"
-10. HID commands: WIN+L (lock screen)
+8. trigger_bus loads pipeline from config.passive["hall_sensor_1"]
+9. trigger_bus calls execute_pipeline()
+10. Branches based on `loop`:
+    - loop=false: executes all scenarios in the pipeline sequentially
+    - loop=true: executes one scenario based on trigger_positions, increments position
+11. Scenario executes (e.g., "scenario_shutdown") via OutputsManager
+12. Cooldown applied (for future NORMAL priority triggers)
 ```
 
 ---
@@ -349,12 +324,12 @@ trigger_bus.fire("btn_double", PRIORITY_NORMAL)
 
 ```json
 "passive": {
-  "hall_sensor_1": "scenario_emergency_shutdown"
+  "hall_sensor_1": { "pipeline": ["scenario_emergency_shutdown"], "loop": false }
 },
 "scenarios": {
   "scenario_emergency_shutdown": [
     {"action": "enter", "count": 3},
-    {"action": "wait", "ms": 500},
+    {"wait": 500},
     {"action": "type", "value": "sudo shutdown -h now"},
     {"action": "key", "combo": "enter"}
   ]
@@ -370,31 +345,24 @@ trigger_bus.fire("btn_double", PRIORITY_NORMAL)
 
 ```json
 "passive": {
-  "hall_sensor_2": "scenario_unlock"
+  "hall_sensor_2": { "pipeline": ["scenario_unlock"], "loop": false }
 },
 "scenarios": {
   "scenario_unlock": [
     {"action": "key", "combo": "super+l"},
-    {"action": "wait", "ms": 200},
+    {"wait": 200},
     {"action": "type", "value": "password123"},
     {"action": "key", "combo": "enter"}
   ]
 }
 ```
 
-**Security Note**: Passwords in plaintext config.json are insecure. Use for non-critical systems only.
-
 ### Dual-Sensor Logic
 
 **Trigger**: Both sensors must activate
-**Implementation**: Requires code modification (not supported by default)
+**Implementation**: Custom logic is required. You should add a custom `Input` class or modify `InputsManager.update()` directly.
 
-**Pseudo-code**:
-```python
-# Custom logic in passive.py
-if sensor_1_active and sensor_2_active:
-    trigger_bus.fire("dual_trigger", PRIORITY_HIGH)
-```
+For details on extending the input system, see [Adding a New Input Type](inputs.md).
 
 ---
 
@@ -403,17 +371,10 @@ if sensor_1_active and sensor_2_active:
 ### Sensor Not Triggering
 
 **Check**:
-1. Verify pin number matches `hardware.hall_sensors[].pin`
-2. Test sensor with multimeter: resistance changes with magnet?
-3. Check `active_low` setting matches sensor behavior
-4. Verify `device.armed = true`
-5. Check serial console for debounce messages
-
-**Debug Output**:
-```python
-# Add to passive.py for debugging
-print(f"[passive] Sensor {idx}: raw={sensor.value}, expected={expected}")
-```
+1. Verify `inputs` configuration matches hardware pins.
+2. Check `active_low` setting matches sensor behavior.
+3. Verify `device.armed = true`.
+4. Check serial console for `[inputs]` logs during boot and debounce events.
 
 ### False Triggers
 
@@ -426,10 +387,8 @@ print(f"[passive] Sensor {idx}: raw={sensor.value}, expected={expected}")
 - Sensor too sensitive (adjust mounting distance)
 
 **Solutions**:
-- Increase `debounce_ms` (e.g., 500ms)
+- Increase `device.debounce_ms` (e.g., 500ms)
 - Add hardware pull-up/pull-down resistors
-- Shield wires from power cables
-- Use shielded/twisted pair cables for sensors
 
 ### Trigger Ignored
 
@@ -438,8 +397,7 @@ print(f"[passive] Sensor {idx}: raw={sensor.value}, expected={expected}")
 **Check**:
 1. Serial console: `[bus] DROP — busy` or `[bus] DROP — cooldown`
 2. Verify scenario name exists in `config.json`
-3. Check USB connected: `supervisor.runtime.usb_connected`
-4. Verify button priority not blocked by active cooldown
+3. Verify button priority not blocked by active cooldown
 
 ---
 
@@ -457,19 +415,13 @@ print(f"[passive] Sensor {idx}: raw={sensor.value}, expected={expected}")
 - **300ms delay** from physical event to trigger fire
 - **Tradeoff**: Lower debounce = faster response but more false triggers
 
-### Memory Usage
-
-- **Per sensor**: ~50 bytes (DigitalInOut object + state)
-- **Handler overhead**: ~200 bytes (lists, timestamps)
-- **Scalable**: Tested with 2 sensors, supports up to 10+
-
 ---
 
 ## Safety Considerations
 
 ### Emergency Triggers
 
-**Design Principle**: Hall sensors bypass cooldown for safety-critical actions
+**Design Principle**: Hall sensors and power monitors bypass cooldown for safety-critical actions
 
 **Example**: Server shutdown must execute even if user just triggered another scenario
 
@@ -490,52 +442,33 @@ trigger_bus.fire("hall_sensor_emergency", PRIORITY_HIGH)
 }
 ```
 
-**Alternative**: Remove sensor bindings from `passive` object
-
----
-
-## Future Enhancements
-
-### Multi-Sensor Logic
-
-Combine multiple sensors with AND/OR logic:
-```python
-if sensor_1 and sensor_2:
-    trigger_bus.fire("both_active")
-elif sensor_1 or sensor_2:
-    trigger_bus.fire("any_active")
-```
-
-### Sensor Events
-
-Current: Only trigger on activation
-Future: Trigger on deactivation, hold duration, rapid toggling
-
-### Threshold Configuration
-
-Hall sensors with analog output: trigger at specific field strength
-
 ---
 
 ## API Reference
 
-### PassiveHandler Class
+### InputsManager Class
 
 **Constructor**:
 ```python
-PassiveHandler()
+InputsManager(i2c=None)
 ```
 
-**Methods**:
+**Lifecycle Methods**:
 ```python
-update()              # Poll sensors, call every main loop
-startup_blink()       # LED feedback on boot
+update()                # Poll all inputs and button, call every main loop
+startup_blink(count=3)  # LED feedback on boot
 ```
 
-**Internal Methods**:
+**INA226 / Power Monitor Methods**:
 ```python
-_check_hall_sensors()  # Poll and debounce Hall sensors
-_check_button()        # Detect button double-click
+@property
+ina_warning_active      # Checks if any power monitor has warning active
+@property
+ina_warning_percent     # Gets warning percent from first active power monitor
+
+cancel_ina_trigger()    # Cancels the trigger on all power monitors
+dismiss_ina_warning()   # Dismisses the warning without cooldown
+get_power_monitor(input_id) # Gets power monitor by ID for direct access
 ```
 
 ---
@@ -545,3 +478,4 @@ _check_button()        # Detect button double-click
 - [Active Trigger System](active-triggers.md)
 - [Trigger Bus Architecture](architecture.md#trigger-system)
 - [Hardware Configuration](../user/config-editor.md#hardware-pins-configuration)
+- [Input System Guide](inputs.md) (How to add a new input type)

@@ -51,9 +51,10 @@ Before submitting code:
 3. Test on actual hardware (not just simulation)
 4. Follow existing code style
 5. Update documentation if needed
-6. Commit with clear message
-7. Push to your fork
-8. Open a Pull Request
+6. Update CHANGELOG.md for any user-facing change
+7. Commit with clear message
+8. Push to your fork
+9. Open a Pull Request
 
 **Code Guidelines**:
 - Python: Follow PEP 8
@@ -83,7 +84,7 @@ Built something cool? Share it!
 ### Medium Priority
 
 - **New screensavers** — Extend screensaver.py
-- **Action types** — Add mouse support, media keys, etc.
+- **New output types** — e.g. mouse support via output_*.py (see docs/developers/outputs.md)
 - **Documentation improvements** — Clarify confusing sections
 - **Config examples** — Homelab, dev, multimedia setups
 

@@ -13,26 +13,34 @@ Technical documentation for developers and contributors.
 - [Execution Flow](#execution-flow)
 - [Module Reference](#module-reference)
 - [Extension Possibilities](#extension-possibilities)
+- [Known Limitations](#known-limitations)
+- [Performance Considerations](#performance-considerations)
+- [Error Handling](#error-handling)
+- [Debugging](#debugging)
+- [Contributing Guidelines](#contributing-guidelines)
+- [License](#license)
 
 ---
 
 ## System Overview
 
-Pico Commander is a **state machine-based automation controller** that translates physical inputs (encoder, sensors, button) into USB HID keyboard commands. The system operates as a **USB HID device** without requiring drivers on the host system.
+Pico Commander is a **trigger-pipeline sequencer** that translates physical inputs (encoder, sensors, button) into USB HID keyboard commands and GPIO control signals. The system operates as a **USB HID device** without requiring drivers on the host system.
 
 ### Core Concepts
 
-1. **Trigger-Action Model** — Events trigger scenarios; scenarios execute HID commands
-2. **Priority System** — Emergency triggers bypass cooldown and queues
-3. **State Persistence** — Menu position and sequence states survive reboots
-4. **Modular Design** — Each input type has isolated handler with unified output bus
+1. **Input → Pipeline → Output Model** — Hardware inputs trigger pipelines; pipelines route steps to appropriate outputs (HID, GPIO)
+2. **Typed I/O Modules** — Extensible input handlers (Hall, power monitor) and output handlers (HID keyboard, GPIO)
+3. **Unified Pipeline Engine** — Both menu triggers and sensor triggers use the same execution engine
+4. **Priority System** — Emergency triggers bypass cooldown and queues
+5. **State Persistence** — Menu position and pipeline states survive reboots
 
 ### Design Philosophy
 
-- **Single Responsibility** — Each module handles one input/output type
+- **Automation Skeleton** — Not a framework you configure around; a small runtime with swappable I/O modules
+- **Single Responsibility** — Each input/output type is an isolated handler class
 - **Fail-Safe** — Hardware errors don't crash the system
 - **Deterministic** — Same inputs produce same outputs every time
-- **Extensible** — New input types integrate via trigger bus API
+- **Extensible** — New input/output types integrate via simple contracts (see [inputs.md](inputs.md) and [outputs.md](outputs.md))
 
 ---
 
@@ -44,65 +52,78 @@ Pico Commander is a **state machine-based automation controller** that translate
 ├─────────────────────────────────────────────────────────────────┤
 │  Rotary Encoder  │  Hall Sensors  │  Button  │  OLED Display   │
 │    (GP6,7,8)     │   (GP15,16)    │  (GP24)  │   (GP4,5 I2C)   │
+│                  │  INA226 Power  │          │                  │
+│                  │  Monitor (I2C) │          │                  │
 └────────┬─────────┴────────┬────────┴─────┬────┴─────────┬───────┘
          │                  │              │              │
          ▼                  ▼              ▼              ▼
-┌────────────────┐  ┌──────────────┐  ┌─────────┐  ┌──────────┐
-│ encoder.py     │  │ passive.py   │  │ config  │  │ display  │
-│ • Rotation     │  │ • Hall sense │  │ loader  │  │ manager  │
-│ • Click        │  │ • Dbl-click  │  └────┬────┘  └────┬─────┘
-│ • Long press   │  │ • Debounce   │       │            │
-└───────┬────────┘  └──────┬───────┘       │            │
-        │                  │                │            │
-        │                  │                ▼            │
-        │                  │         ┌──────────────┐   │
-        │                  │         │  config.py   │   │
-        │                  │         │ • JSON parse │   │
-        │                  │         │ • State mgmt │   │
-        │                  │         └──────┬───────┘   │
-        │                  │                │            │
-        └──────────────────┼────────────────┘            │
-                           │                             │
-                           ▼                             │
-                  ┌──────────────────┐                  │
-                  │   trigger_bus.py │                  │
-                  │ ┌──────────────┐ │                  │
-                  │ │ Priority     │ │                  │
-                  │ │ Queue        │ │                  │
-                  │ └──────────────┘ │                  │
-                  │ • Anti-spam      │                  │
-                  │ • Cooldown       │                  │
-                  │ • Busy flag      │                  │
-                  └────────┬─────────┘                  │
-                           │                             │
-                           ▼                             │
-                  ┌──────────────────┐                  │
-                  │ Scenario Engine  │                  │
-                  │ • Parse steps    │                  │
-                  │ • Execute cmds   │                  │
-                  └────────┬─────────┘                  │
-                           │                             │
-                           ▼                             │
-                  ┌──────────────────┐                  │
-                  │  adafruit_hid    │                  │
-                  │ • Keyboard       │                  │
-                  │ • Layout (US)    │                  │
-                  │ • Keycodes       │                  │
-                  └────────┬─────────┘                  │
-                           │                             │
-                           ▼                             ▼
-                  ┌──────────────────┐         ┌────────────────┐
-                  │   USB HID        │         │ OLED Feedback  │
-                  │   Interface      │         │ • Animations   │
-                  │                  │         │ • Screensavers │
-                  └──────────────────┘         └────────────────┘
+┌────────────────┐  ┌───────────────────────────┐  ┌──────────┐
+│ encoder.py     │  │ inputs_manager.py         │  │ display  │
+│ • Rotation     │  │ • HallSensorInput         │  │ manager  │
+│ • Click        │  │ • PowerMonitorInput       │  └────┬─────┘
+│ • Long press   │  │ • Button dbl-clk          │       │
+└───────┬────────┘  └──────┬────────────────────┘       │
+        │                  │                            │
+        │                  │                            ▼
+        │                  │                  ┌──────────────────┐
+        │                  │                  │  config.py       │
+        │                  │                  │ • JSON parse     │
+        │                  │                  │ • State mgmt     │
+        │                  │                  │ • inputs{}       │
+        │                  │                  │ • outputs{}      │
+        │                  │                  └──────┬───────────┘
+        │                  │                         │
+        └──────────────────┼─────────────────────────┘
                            │
                            ▼
-                  ┌──────────────────┐
-                  │   HOST SYSTEM    │
-                  │  (Any OS with    │
-                  │   USB support)   │
-                  └──────────────────┘
+                  ┌────────────────────────┐
+                  │   trigger_bus.py       │
+                  │                        │
+                  │  Pipeline Engine:      │
+                  │ ┌────────────────────┐ │
+                  │ │ execute_pipeline() │ │
+                  │ │ • loop: true/false │ │
+                  │ │ • Priority queue   │ │
+                  │ │ • Busy flag        │ │
+                  │ │ • Cooldown         │ │
+                  │ └────────────────────┘ │
+                  │                        │
+                  │  OutputsManager:       │
+                  │ ┌────────────────────┐ │
+                  │ │ Route by output="" │ │
+                  │ └───────┬────────────┘ │
+                  └─────────┼──────────────┘
+                            │
+             ┌──────────────┴──────────────┐
+             ▼                             ▼
+    ┌────────────────┐           ┌───────────────────┐
+    │ output_hid.py  │           │ output_gpio.py    │
+    │ • type         │           │ • gpio_pulse      │
+    │ • key          │           │ • gpio_set        │
+    │ • enter        │           │ • gpio_hold       │
+    │ • wait         │           │ • active_high     │
+    └────────┬───────┘           └────────┬──────────┘
+             │                            │
+             ▼                            ▼
+    ┌────────────────┐           ┌──────────────┐
+    │ adafruit_hid   │           │ digitalio    │
+    │ • Keyboard     │           │ GPIO pins    │
+    │ • Layout (US)  │           └──────┬───────┘
+    │ • Keycodes     │                  │
+    └────────┬───────┘                  │
+             │                          │
+             ▼                          ▼
+    ┌────────────────┐         ┌──────────────────┐
+    │   USB HID      │         │ GPIO Output      │
+    │   Interface    │         │ Relay/Opto/Power │
+    └────────┬───────┘         └──────────────────┘
+             │
+             ▼
+    ┌────────────────┐
+    │   HOST SYSTEM  │
+    │  (Any OS with  │
+    │   USB support) │
+    └────────────────┘
 ```
 
 ---
@@ -116,33 +137,37 @@ Pico Commander is a **state machine-based automation controller** that translate
 **Responsibilities**:
 - Initialize all subsystems in correct order
 - Process encoder events via callback
-- Update passive sensors
+- Update sensors via InputsManager
 - Manage display sleep/wake cycles
-- Handle screensaver timing
+- Handle screensaver and warning overlays
 
 **Boot Sequence**:
 ```python
 1. config.load()           # Parse config.json and state.json
 2. trigger_bus.init()      # Initialize HID keyboard (MUST be before fire())
-3. DisplayManager()        # Initialize OLED display
-4. PassiveHandler()        # Setup Hall sensors and button
-5. EncoderHandler()        # Setup rotary encoder
-6. Main loop starts        # Enter event processing loop
+3. display                 # Initialize OLED display
+4. inputs_manager          # Setup Hall sensors, INA226, button
+5. encoder                 # Setup rotary encoder callback
+6. warning_screen / splash_screen # Setup overlays
+7. auto_boot setup         # Check for auto_boot outputs
+8. Main loop starts        # Enter event processing loop
 ```
 
 **Main Loop Logic**:
-```
+```python
 while True:
-    passive.update()       # Poll Hall sensors and button (10ms cycle)
+    inputs.update()        # Poll sensors and button
     encoder.update()       # Poll encoder, call callback on events
     
     # Screen timeout check
     if (now - last_interaction) > timeout:
         if screensaver_enabled:
             display.start_screensaver()
-            screensaver.update()  # 20 FPS animation
+            screensaver.update()
         else:
             display.sleep()
+            
+    # Handle overlays and auto_boot cycles...
     
     sleep(10ms)            # 100 Hz polling rate
 ```
@@ -152,8 +177,8 @@ while True:
 **Purpose**: Centralized configuration and state management
 
 **Files**:
-- `config.json` — Static configuration (menu structure, scenarios, hardware pins)
-- `state.json` — Runtime state (menu cursor position, sequence indices)
+- `config.json` — Static configuration (menu structure, scenarios, hardware pins, inputs, outputs)
+- `state.json` — Runtime state (menu cursor position, sequence/pipeline indices)
 
 **API**:
 ```python
@@ -163,46 +188,16 @@ config.get_state()           # Returns mutable state dict
 config.save_state()          # Persist state.json to disk
 ```
 
-**Config Structure**:
-```json
-{
-  "hardware": {
-    "encoder_clk": 6,
-    "hall_sensors": [...]
-  },
-  "device": {
-    "armed": true,
-    "cooldown_ms": 5000
-  },
-  "passive": {
-    "hall_sensor_1": "scenario_name"
-  },
-  "active_menu": [...],
-  "scenarios": {
-    "scenario_name": [...]
-  }
-}
-```
-
-**State Structure**:
-```json
-{
-  "menu_cursor": 0,
-  "seq_positions": {
-    "menu_item_id": 2
-  }
-}
-```
-
 ### 3. Trigger Bus (`trigger_bus.py`)
 
-**Purpose**: Central execution hub with anti-conflict protection
+**Purpose**: Central execution hub with unified pipeline engine and output routing.
 
 **Key Features**:
-- **Single Execution Point** — All scenarios go through one bottleneck
-- **Priority System** — Emergency triggers bypass normal rules
-- **Cooldown Protection** — Prevents accidental double-execution
-- **Busy Flag** — Rejects triggers during scenario execution
+- **Single Execution Point** — All scenarios go through `execute_pipeline()`.
+- **Outputs Manager** — Routes scenario steps to the correct output handler (e.g., HID, GPIO) based on `step["output"]`.
+- **Priority System** — Emergency triggers bypass normal rules.
+- **Cooldown Protection** — Prevents accidental double-execution.
+- **Busy Flag** — Rejects triggers during scenario execution.
 
 **Priority Levels**:
 ```python
@@ -211,130 +206,55 @@ PRIORITY_NORMAL = 1  # Menu actions, button
 PRIORITY_HIGH   = 2  # Hall sensors (emergency) - bypasses cooldown
 ```
 
-**API**:
-```python
-# Initialize HID keyboard (MUST call before fire())
-trigger_bus.init()
+### 4. Input Manager (`inputs_manager.py`)
 
-# Fire passive trigger (Hall sensor, button)
-trigger_bus.fire(trigger_name, priority=PRIORITY_NORMAL)
+**Purpose**: Unified manager for all input sensors.
 
-# Fire active menu item sequence
-trigger_bus.fire_active(item_id)
+**Inputs Supported**:
+- `HallSensorInput`: Hall effect sensors (active-low or active-high) for emergency triggers.
+- `PowerMonitorInput`: INA226 I2C battery voltage/current monitor, triggers on low battery thresholds.
+- **Button**: Boot button double-click detection.
 
-# Check execution state
-trigger_bus.is_busy()
+**Logic**:
+- Reads from `config["inputs"]` and dynamically creates appropriate handlers.
+- Implements anti-bounce logic for mechanical inputs.
+- Emits triggers via `trigger_bus.fire()`.
 
-# Get next action name for display (non-destructive)
-trigger_bus.get_next_action_name(item_id)
-```
+### 5. Outputs Manager & Handlers (`trigger_bus.py` + `output_*.py`)
 
-**Conflict Resolution**:
-```python
-def _can_fire(priority):
-    if _busy:
-        return False  # Reject: scenario already running
-    
-    if priority < PRIORITY_HIGH and now < _cooldown_until:
-        return False  # Reject: cooldown active (unless emergency)
-    
-    return True
-```
+**Purpose**: Extensible system for executing scenario steps across different hardware.
 
-### 4. Display Manager (`display.py`)
+**Outputs Supported**:
+- `HidOutput` (`output_hid.py`): USB keyboard commands (`key`, `type`, `wait`, `enter`).
+- `GpioOutput` (`output_gpio.py`): Digital pin control (`gpio_pulse`, `gpio_set`, `gpio_hold`).
 
-**Purpose**: OLED display driver with animations and screensavers
+**Logic**:
+- Managed by `OutputsManager` inside `trigger_bus.py`.
+- Resolves target via `step.get("output", "hid")`.
+- Dispatches execution to the respective `OutputHandler.execute(action)`.
+
+### 6. Display Manager (`display.py`)
+
+**Purpose**: OLED display driver with animations and screensavers.
 
 **Features**:
-- 128×32 SSD1306 OLED via I2C
-- Swipe animations for menu transitions
-- Screensaver support (Tesseract, Starfield, Matrix)
-- Auto-refresh management for flicker-free animations
+- 128×32 SSD1306 OLED via I2C.
+- Swipe animations for menu transitions.
+- Screensaver support.
 
-**Display Layout**:
-```
-┌────────────────────────────────┐
-│  y=4  │ < MENU >               │  Header line
-│  y=16 │ Current Item Label     │  Main content (center)
-│  y=27 │ -> Next Action         │  Footer line
-└────────────────────────────────┘
-```
+### 7. Encoder Handler (`encoder.py`)
 
-**API**:
-```python
-display.draw_menu(label, action_hint)
-display.show_executing(label, action)
-display.show_status(line1, line2, line3)
-display.animate_swipe(old_label, new_label, direction)
+**Purpose**: Rotary encoder input processing with debouncing.
 
-display.start_screensaver(name)
-display.update_screensaver()
-display.stop_screensaver()
+**Hardware**: KY-040 rotary encoder (CLK, DT, SW pins).
 
-display.sleep()
-display.wake()
-```
+### 8. INA226 Power Monitor (`ina226_monitor.py`)
 
-### 5. Encoder Handler (`encoder.py`)
+**Purpose**: I2C battery voltage and current monitoring with graceful degradation.
 
-**Purpose**: Rotary encoder input processing with debouncing
+### 9. Warning & Splash Screens (`warning_screen.py`, `splash_screen.py`)
 
-**Hardware**: KY-040 rotary encoder (CLK, DT, SW pins)
-
-**Events**:
-```python
-EV_ROTATE_LEFT   # Counter-clockwise rotation
-EV_ROTATE_RIGHT  # Clockwise rotation
-EV_PRESS         # Short click (<1s)
-EV_LONG_PRESS    # Long hold (≥1s)
-```
-
-**Internal Logic**:
-```python
-# Hardware-debounced rotation via rotaryio
-encoder.position → delta → emit EV_ROTATE_* (steps)
-
-# Software-debounced button
-SW pin → debounce (50ms) → held duration check → emit EV_PRESS or EV_LONG_PRESS
-```
-
-**Callback Pattern**:
-```python
-def on_encoder_event(event):
-    if event == EV_ROTATE_RIGHT:
-        menu_cursor = (menu_cursor + 1) % len(menu)
-        display.animate_swipe(old, new, "right")
-    elif event == EV_PRESS:
-        trigger_bus.fire_active(current_item_id)
-
-encoder.set_callback(on_encoder_event)
-```
-
-### 6. Passive Handler (`passive.py`)
-
-**Purpose**: Hall sensors and button monitoring with debouncing
-
-**Inputs**:
-- Hall sensors (active-low or active-high)
-- Boot button double-click detection
-
-**Anti-Bounce Logic**:
-```python
-# Debounce timing
-if (now - last_change_time) < debounce_ms:
-    return  # Ignore noise
-    
-# State change confirmed
-if new_state != old_state:
-    trigger_bus.fire(trigger_name, PRIORITY_HIGH)
-```
-
-**Double-Click Detection**:
-```python
-# Button click within time window
-if (now - last_click) < double_click_window:
-    trigger_bus.fire("btn_double", PRIORITY_NORMAL)
-```
+**Purpose**: Overlays for battery status and warnings.
 
 ---
 
@@ -345,105 +265,48 @@ if (now - last_click) < double_click_window:
 **Passive Triggers** (asynchronous, hardware-driven):
 - Hall sensor activation
 - Button double-click
+- INA226 low battery threshold
 
 **Active Triggers** (synchronous, user-driven):
 - Encoder click on menu item
-- Menu item sequences (toggle between scenarios)
 
 ### Execution Guarantees
 
-1. **At-Most-Once** — Cooldown prevents double execution
-2. **Non-Reentrant** — Busy flag rejects overlapping triggers
-3. **Priority Override** — High-priority triggers bypass cooldown
-4. **USB Detection** — Scenarios skip execution if USB disconnected
-
-### Cooldown Mechanics
-
-```python
-# After scenario completes
-_cooldown_until = now + cooldown_ms / 1000.0
-
-# Future trigger attempts
-if priority < PRIORITY_HIGH and now < _cooldown_until:
-    print("DROP — cooldown active")
-    return False
-```
-
-**Purpose**: Prevent accidental multi-execution from:
-- Encoder bounce
-- Rapid clicks
-- Sensor oscillation
-
-**Exception**: Emergency triggers (Hall sensors) bypass cooldown for safety.
+1. **At-Most-Once** — Cooldown prevents double execution.
+2. **Non-Reentrant** — Busy flag rejects overlapping triggers.
+3. **Priority Override** — High-priority triggers bypass cooldown.
+4. **Resilient Steps** — A single failed step (e.g., USB not connected for HID) logs a warning but DOES NOT halt the remaining scenario steps.
 
 ---
 
 ## Execution Flow
 
-### Active Menu Item Execution
+### Unified Pipeline Engine
 
-```
-User rotates encoder
-    └─> encoder.update() detects position change
-        └─> on_encoder_event(EV_ROTATE_RIGHT)
-            └─> menu_cursor = (cursor + 1) % len(menu)
-                └─> display.animate_swipe(old, new, "right")
-                    └─> save_cursor()
+Both active and passive triggers use the same engine: `execute_pipeline(pipeline_config, trigger_id, priority)`.
 
-User clicks encoder
-    └─> encoder.update() detects button press
-        └─> on_encoder_event(EV_PRESS)
-            └─> item = current_menu_list[menu_cursor]
-                └─> Has sequence?
-                    YES: trigger_bus.fire_active(item_id)
-                         └─> Load seq_positions[item_id]
-                             └─> Get current scenario from sequence
-                                 └─> _run_scenario(scenario_name)
-                                     └─> Execute steps sequentially
-                                         └─> HID keyboard commands
-                                     └─> Advance sequence position
-                                         └─> save_state()
-                    NO:  Enter submenu (if exists)
-```
+`fire()` (passive) and `fire_active()` (menu) act as thin facades that convert their configuration into a standardized `pipeline_config` and pass it to `execute_pipeline()`.
 
-### Passive Trigger Execution
+**Pipeline Semantics (`loop: true` vs `loop: false`)**:
+- `loop: false`: Executes the entire chain of scenarios sequentially in one go, without tracking position.
+- `loop: true`: Executes exactly one scenario per trigger event, advancing a pointer in `state.json["trigger_positions"]` so the next trigger runs the next scenario in the cycle.
 
-```
-Hall sensor activates
-    └─> passive.update() detects state change
-        └─> Debounce check passes
-            └─> trigger_bus.fire("hall_sensor_1", PRIORITY_HIGH)
-                └─> Check _can_fire(PRIORITY_HIGH)
-                    └─> Bypass cooldown (emergency priority)
-                        └─> Load scenario from config.passive["hall_sensor_1"]
-                            └─> _run_scenario(scenario_name)
-                                └─> Execute steps sequentially
-                                    └─> HID keyboard commands
-                                └─> Apply cooldown (future normal triggers)
-```
+**Backward Compatibility**:
+`fire_active()` still supports the old `"sequence"` format by resolving it into a `loop: true` pipeline using `_resolve_seq_entry()`.
 
-### Scenario Step Execution
+### Step Resolution & Execution
 
 ```python
+# Inside _run_scenario(name):
 for step in scenario_steps:
-    action = step["action"]
+    output_name = step.get("output", "hid")  # Default to 'hid' for legacy support
     
-    if action == "key":
-        keys = parse_combo(step["combo"])  # "ctrl+c" → [Keycode.CONTROL, Keycode.C]
-        keyboard.press(*keys)
-        keyboard.release_all()
+    # OutputsManager.execute() routes to the specific handler
+    success = _outputs_manager.execute(output_name, step)
     
-    elif action == "type":
-        layout.write(step["value"])  # Types string character by character
-    
-    elif action == "wait":
-        time.sleep(step["ms"] / 1000.0)
-    
-    elif action == "enter":
-        for _ in range(step["count"]):
-            keyboard.press(Keycode.ENTER)
-            keyboard.release_all()
-            time.sleep(0.05)  # 50ms between repeats
+    if not success:
+        print(f"[bus] WARNING: step failed for output '{output_name}'")
+        # Execution CONTINUES for the next step despite failure
 ```
 
 ---
@@ -451,244 +314,75 @@ for step in scenario_steps:
 ## Module Reference
 
 ### `code.py` — Main Application
-
-**Global State**:
-- `root_menu` — Immutable reference to top-level menu
-- `current_menu_list` — Currently displayed menu level
-- `menu_cursor` — Current selection index
-- `menu_stack` — Navigation history for back navigation
-- `last_interaction_time` — Timestamp for screen timeout
-- `screen_sleeping` — Display sleep state flag
-- `screensaver_active` — Screensaver running flag
-
-**Functions**:
-- `get_current_label()` — Returns label of selected item
-- `get_current_action()` — Returns next action name in sequence
-- `refresh_menu()` — Redraws display without animation
-- `save_cursor()` — Persists menu position to state.json
-- `wake_up_display()` — Exits sleep/screensaver, shows menu
-- `on_encoder_event(event)` — Main event handler callback
+- `root_menu`, `current_menu_list`, `menu_cursor`, `menu_stack`
+- Initializer for all components.
+- Main loop polling `inputs.update()` and `encoder.update()`.
 
 ### `trigger_bus.py` — Execution Bus
+- `init()` — Initializes `OutputsManager`.
+- `execute_pipeline(pipeline_config, trigger_id, priority)` — Core execution logic.
+- `fire(trigger_name, priority)` — Passive trigger facade.
+- `fire_active(item_id)` — Active trigger facade.
+- `_outputs_manager` — Instance of `OutputsManager` for routing steps.
 
-**Module State**:
-- `_kbd` — Keyboard HID device
-- `_layout` — KeyboardLayoutUS instance
-- `_key_map` — String to Keycode mapping dict
-- `_busy` — Execution lock flag
-- `_cooldown_until` — Timestamp when cooldown expires
+### `inputs_manager.py` — Input Manager
+- `InputsManager`: Reads `config["inputs"]` and initializes handlers.
+- `HallSensorInput`: Handles debounced Hall sensor reads.
+- `PowerMonitorInput`: Manages INA226 polling and threshold checks.
 
-**Public Functions**:
-- `init()` — Initialize HID devices
-- `fire(trigger_name, priority)` — Execute passive trigger
-- `fire_active(item_id)` — Execute menu item sequence
-- `is_busy()` — Check if scenario running
-- `get_next_action_name(item_id)` — Preview next action
+### `output_base.py` — Output Contract
+- `OutputHandler`: Base class defining `execute(action)` and `cleanup()`.
 
-**Internal Functions**:
-- `_find_item(menu, item_id)` — Recursive menu search
-- `_can_fire(priority)` — Anti-conflict checks
-- `_apply_cooldown()` — Set cooldown timer
-- `_run_scenario(name)` — Execute scenario steps
-- `_build_key_map()` — Generate string→keycode mapping
-- `_parse_combo(combo_str)` — Parse "ctrl+c" to keycodes
+### `output_hid.py` — HID Output
+- `HidOutput`: Executes `key`, `type`, `wait`, `enter` actions via USB HID.
 
-### `display.py` — Display Driver
-
-**Constants**:
-- `_W = 128` — Display width
-- `_H = 32` — Display height
-- `_ADDR = 0x3C` — I2C address
-
-**Instance Variables**:
-- `_disp` — SSD1306 display object
-- `_main_group` — Primary display group (menu)
-- `_anim_group` — Animation display group (swipe)
-- `_screensaver_group` — Screensaver display group
-- `_lbl_top`, `_lbl_center`, `_lbl_bottom` — Label objects
-- `_screensaver_manager` — Active screensaver instance
-
-**Methods**:
-- `draw_menu()` — Display menu state
-- `show_executing()` — Display execution feedback
-- `show_status()` — Display 3-line status message
-- `animate_swipe()` — 6-frame horizontal slide animation
-- `start_screensaver()` — Initialize and display screensaver
-- `update_screensaver()` — Render next frame (20 FPS)
-- `stop_screensaver()` — Exit screensaver, restore menu
-- `sleep()` — Turn off display
-- `wake()` — Turn on display
-
-### `encoder.py` — Encoder Driver
-
-**Instance Variables**:
-- `_enc` — rotaryio.IncrementalEncoder (hardware-debounced)
-- `_last_pos` — Previous encoder position
-- `_sw` — DigitalInOut (switch pin)
-- `_sw_last_raw` — Raw switch state
-- `_sw_stable` — Debounced switch state
-- `_sw_deb_t` — Debounce timer
-- `_sw_press_t` — Press start timestamp
-- `_sw_held` — Long press detection flag
-- `_callback` — Event handler function
-
-**Methods**:
-- `set_callback(cb)` — Register event handler
-- `update()` — Poll encoder state (call every loop)
-- `_emit(event)` — Internal: invoke callback
-- `_process_rotation()` — Internal: detect rotation
-- `_process_button(now)` — Internal: debounce button, detect press type
-
-### `passive.py` — Passive Sensors
-
-**Instance Variables**:
-- `_hall_sensors` — List of Hall sensor DigitalInOut objects
-- `_button` — Button DigitalInOut object
-- `_led` — Status LED DigitalInOut object
-- `_armed` — Enable/disable Hall sensor triggers
-- `_debounce_ms` — Anti-bounce delay
-- `_last_hall_states` — Previous Hall sensor readings
-- `_last_hall_times` — Debounce timestamps
-- `_btn_last_click` — Last button click timestamp
-
-**Methods**:
-- `update()` — Poll sensors (call every loop)
-- `startup_blink()` — LED feedback on boot
-- `_check_hall_sensors()` — Internal: poll and debounce Hall sensors
-- `_check_button()` — Internal: double-click detection
+### `output_gpio.py` — GPIO Output
+- `GpioOutput`: Executes `gpio_pulse`, `gpio_set`, `gpio_hold` actions on hardware pins.
 
 ### `config.py` — Configuration Loader
+- `load()`, `get_config()`, `get_state()`, `save_state()`.
+- `_migrate_state()`: Migrates only legacy `seq_positions` for top-level menu items. `trigger_positions` does not require migration (uses `.get(key, 0)` with a default).
 
-**Module State**:
-- `_config_data` — Parsed config.json dict
-- `_state_data` — Parsed state.json dict
+### `display.py` — Display Driver
+- SSD1306 display object manager and animation handler.
 
-**Functions**:
-- `load()` — Load config.json and state.json from disk
-- `get_config()` — Return config dict (read-only)
-- `get_state()` — Return state dict (read-write)
-- `save_state()` — Persist state dict to state.json
-
-### `screensaver.py` — Screensaver Effects
-
-**Class**: `ScreensaverManager`
-
-**Supported Effects**:
-- `tesseract` — 4D hypercube rotation
-- `starfield` — 3D star movement with perspective
-- `matrix` — Matrix-style falling characters
-
-**Methods**:
-- `__init__(bitmap, name)` — Initialize screensaver
-- `draw_frame()` — Render next animation frame
+### `encoder.py` — Encoder Driver
+- Rotary encoder input processing and debouncing.
 
 ---
 
 ## Extension Possibilities
 
 ### Adding New Input Types
-
-**Example**: Adding a new sensor type
-
-1. Create handler module (e.g., `gyro.py`)
-2. Initialize in `code.py` boot sequence
-3. Poll in main loop: `gyro.update()`
-4. Fire triggers via bus: `trigger_bus.fire("gyro_tilt", priority)`
-5. Add trigger binding in `config.json` → `passive` section
-
-**Integration Pattern**:
-```python
-# gyro.py
-class GyroHandler:
-    def __init__(self):
-        # Initialize hardware
-        pass
-    
-    def update(self):
-        if self._detect_tilt():
-            trigger_bus.fire("gyro_tilt", PRIORITY_NORMAL)
-
-# code.py
-gyro = GyroHandler()
-
-while True:
-    gyro.update()
-    # ... rest of loop
-```
+Adding a new sensor or input mechanism requires implementing a handler class in `inputs_manager.py`.
+See [Input System guide](inputs.md) for the full walkthrough.
 
 ### Adding New Action Types
-
-**Example**: Adding mouse movement
-
-1. Import `adafruit_hid.mouse` in `trigger_bus.py`
-2. Initialize mouse device: `_mouse = Mouse(usb_hid.devices)`
-3. Add action parser in `_run_scenario()`:
-```python
-elif action == "mouse_move":
-    dx = step.get("x", 0)
-    dy = step.get("y", 0)
-    _mouse.move(dx, dy)
-```
-4. Use in scenarios:
-```json
-"scenario_mouse_test": [
-    {"action": "mouse_move", "x": 100, "y": 50},
-    {"action": "wait", "ms": 100}
-]
-```
+Adding a new output capability (e.g., networking, I2C commands) involves creating a new class inheriting from `OutputHandler`.
+See [Output System guide](outputs.md) for the full walkthrough.
 
 ### Adding Network Features
-
-**Potential**: Remote trigger via WiFi (requires Pico W)
-
-1. Configure WiFi in `settings.toml`
-2. Add network module (e.g., `network.py`)
-3. Listen for HTTP/MQTT triggers
-4. Fire scenarios via trigger bus
-
-**Example Architecture**:
-```python
-# network.py (pseudo-code)
-import wifi
-import socketpool
-
-def listen_for_triggers():
-    while True:
-        request = socket.accept()
-        scenario = parse_request(request)
-        trigger_bus.fire_scenario(scenario)
-```
+**Potential**: Remote trigger via WiFi (requires Pico W).
+1. Configure WiFi in `settings.toml`.
+2. Add network module listening for HTTP/MQTT triggers.
+3. Fire scenarios via `trigger_bus`.
 
 ### Custom Display Modes
-
-**Example**: Status dashboard mode
-
-1. Add mode flag in `config.json` → `device.display_mode`
-2. Create dashboard renderer in `display.py`
-3. Switch modes based on long-press or sensor
-
-**Dashboard Elements**:
-- System uptime
-- Trigger count statistics
-- Last executed scenario
-- USB connection status
+**Potential**: Status dashboard mode displaying system uptime, trigger counts, or USB connection status.
 
 ### Macro Recording
-
-**Concept**: Record keystrokes and save as scenario
-
-1. Add recording mode trigger
-2. Capture HID input via serial monitor
-3. Convert to scenario JSON format
-4. Save to `config.json` or separate file
+**Potential**: Record keystrokes and save as a scenario to `config.json`.
 
 ### Multi-Device Sync
+**Potential**: Share configurations across multiple Pico Commanders by exporting/importing `config.json`.
 
-**Concept**: Share configurations across multiple Pico Commanders
+---
 
-1. Export `config.json` to SD card or network
-2. Import on other devices
-3. Maintain device-specific hardware pins in separate file
+## Known Limitations
+
+- **Auto-Boot GPIO Limit**: The `auto_boot` feature supports only one GPIO output simultaneously. It picks the first output found with `auto_boot.enabled: true` and ignores the rest.
+- **GPIO Set Asymmetry**: `gpio_set` in `output_gpio.py` intentionally works with the literal electrical level (`"value": "high"/"low"` directly on the pin), bypassing the `active_high` configuration. This is for raw/low-level pin control. Conversely, `gpio_pulse` and `gpio_hold` respect the `active_high` flag.
+- **Config Studio Limitations**: The web UI (Config Studio / `editor.html`) currently does not allow assembling a pipeline with `loop: false` and multiple scenarios via the interface. It must be done through Raw JSON or manual editing of `config.json`, even though the pipeline engine fully supports it.
 
 ---
 
@@ -705,21 +399,12 @@ def listen_for_triggers():
 | Scenario step | Varies | <1ms per step | Except wait actions |
 | Screensaver frame | 50ms | 50ms | 20 FPS target |
 
-### Memory Usage
-
-Typical runtime memory footprint:
-- **Code**: ~30KB (Python bytecode)
-- **Libraries**: ~45KB (mpy files)
-- **Config**: ~5-20KB (depends on menu size)
-- **Display buffers**: ~2KB (128×32 bitmap + labels)
-- **Free RAM**: ~100KB available for future features
-
 ### Optimization Tips
 
-1. **Use .mpy files** — Precompiled libraries save RAM
-2. **Minimize string allocations** — Reuse label objects in display
-3. **Limit scenario complexity** — Long scenarios block input processing
-4. **Avoid deep menu nesting** — Stack depth limited by RAM
+1. **Use .mpy files** — Precompiled libraries save RAM.
+2. **Minimize string allocations** — Reuse label objects in display.
+3. **Limit scenario complexity** — Long scenarios block input processing.
+4. **Avoid deep menu nesting** — Stack depth limited by RAM.
 
 ---
 
@@ -728,36 +413,23 @@ Typical runtime memory footprint:
 ### Hardware Failures
 
 **OLED Display**:
-- If init fails, system continues without display
-- Graceful degradation: no visual feedback, but commands still work
+- If init fails, system continues without display.
 
 **Encoder**:
-- If pins not responding, no events emitted
-- System remains responsive to Hall sensors and code reloads
-
-**Hall Sensors**:
-- Pin read failures are silent
-- Misconfigured active_low just inverts behavior
+- If pins not responding, no events emitted. System remains responsive to other inputs.
 
 ### Configuration Errors
 
-**Invalid JSON**:
-- Boot fails with error in serial console
-- Fix config.json and reload code
-
 **Missing Scenarios**:
-- Trigger fires, but scenario not found → logged, no crash
-- Display shows "Executing..." but nothing happens
+- Trigger fires, but scenario not found → logged, no crash.
 
-**Invalid Keycodes**:
-- Unknown key in combo → ignored, rest of combo executes
-- Logged to serial: `[bus] unknown key: xyz`
+**Invalid Action/Step**:
+- Unknown key or failed action → logged (`[bus] WARNING: step failed...`), but the rest of the scenario continues to execute.
 
 ### USB Disconnection
 
-- Scenario execution checks `supervisor.runtime.usb_connected`
-- If disconnected, scenario skips silently
-- No keyboard output, no errors
+- Scenario execution via `HidOutput` checks `supervisor.runtime.usb_connected`.
+- If disconnected, the step skips silently without failing the whole scenario.
 
 ---
 
@@ -781,35 +453,19 @@ screen /dev/cu.usbmodem* 115200
 **Log Messages**:
 ```
 [main] active_menu: 8 items
-[bus] keyboard OK
+[outputs] Manager ready: 2 outputs loaded
+[bus] Outputs manager OK
 [display] init OK  SDA=GP 4  SCL=GP 5
-[encoder] init OK  CLK=GP 6  DT=GP 7  SW=GP 8
-[passive] init OK  Hall sensors: 2
+[inputs] Hall hall_sensor_1 на GP15, active_low:True — начальное: PRESENT
+[inputs] Manager OK, armed: True, inputs: 2
 [main] Ready!
 
 [bus] → scenario_nextcloud_stop
+[output:hid] key: ctrl+c
 [bus] ✓ scenario_nextcloud_stop
 
 [bus] DROP — cooldown 4.3 s
 ```
-
-### Common Issues
-
-**Scenarios don't execute**:
-1. Check `trigger_bus.init()` called before any `fire()`
-2. Verify USB connected: `supervisor.runtime.usb_connected`
-3. Check cooldown not active: wait 5 seconds between triggers
-4. Verify scenario exists in `config.json`
-
-**Menu doesn't scroll**:
-1. Check encoder wiring: CLK/DT pins correct
-2. Swap CLK/DT if direction inverted
-3. Adjust `divisor=4` in `encoder.py` if skipping items
-
-**Display blank**:
-1. Check I2C wiring: SDA/SCL pins
-2. Verify I2C address: `0x3C` (most common) or `0x3D`
-3. Check power: 3.3V to VCC
 
 ---
 
@@ -825,19 +481,11 @@ screen /dev/cu.usbmodem* 115200
 ### Testing
 
 Before submitting changes:
-1. Test on actual hardware (not just simulation)
-2. Verify all menu navigation paths
-3. Test passive triggers (Hall sensors, button)
-4. Check USB HID output in text editor
-5. Verify state persistence across reboots
-
-### Documentation
-
-Update docs when adding:
-- New configuration options
-- New action types
-- New hardware support
-- API changes
+1. Test on actual hardware (not just simulation).
+2. Verify all menu navigation paths.
+3. Test passive triggers (Hall sensors, INA226, button).
+4. Check USB HID output in text editor.
+5. Verify state persistence across reboots.
 
 ---
 

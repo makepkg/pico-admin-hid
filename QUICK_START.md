@@ -69,16 +69,23 @@ Copy-Item -Recurse lib\* D:\lib\
 Copy all Python files to CIRCUITPY root:
 
 ```bash
-# Files to copy:
+# Required files:
 boot.py
 code.py
 config.py
 config.json
 display.py
 encoder.py
-passive.py
+inputs_manager.py
+output_base.py
+output_hid.py
+output_gpio.py
 trigger_bus.py
 screensaver.py
+ina226_monitor.py
+splash_screen.py
+splash_trigger.py
+warning_screen.py
 ```
 
 **Linux/macOS**:
@@ -156,15 +163,16 @@ Add to `config.json`:
 ```json
 "scenarios": {
   "test_hello": [
-    {"action": "type", "value": "Hello from Pico Commander!"},
-    {"action": "key", "combo": "enter"}
+    {"output": "hid", "action": "type", "value": "Hello from Pico Commander!"},
+    {"output": "hid", "action": "key", "combo": "enter"}
   ]
 },
 "active_menu": [
   {
     "id": "test_item",
     "label": "Test Hello",
-    "sequence": [{"scenario": "test_hello", "name": "Run"}]
+    "pipeline": ["test_hello"],
+    "loop": false
   }
 ]
 ```
@@ -201,6 +209,7 @@ Open text editor, select "Test Hello", click encoder. Text should appear!
 
 - **Complete Installation**: [README.md](README.md#-installation)
 - **Config Editor Guide**: [docs/user/config-editor.md](docs/user/config-editor.md)
+- **Pipelines & Scenarios**: [docs/user/pipelines.md](docs/user/pipelines.md)
 - **Technical Docs**: [docs/developers/](docs/developers/)
 
 ---

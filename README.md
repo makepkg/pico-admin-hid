@@ -9,7 +9,7 @@
 
 **Physical macro pad & server controller with OLED display, rotary encoder, and Hall effect sensors**
 
-[Features](#-features) • [Hardware](#-hardware-scheme) • [Installation](#-installation) • [Quick Start](QUICK_START.md) • [Documentation](docs/) • [License](#-license)
+[Features](#-features) • [Hardware](#-hardware-scheme) • [Installation](#-installation) • [Quick Start](QUICK_START.md) • [Documentation](docs/) • [Changelog](CHANGELOG.md) • [License](#-license)
 
 </div>
 
@@ -22,9 +22,14 @@
 - **OLED Display (128×32)** — Visual menu navigation with screensavers
 - **Rotary Encoder** — Browse menus, execute actions with click/long-press
 - **Hall Effect Sensors** — Trigger emergency scenarios (e.g., safe shutdown)
+- **INA226 Power Monitor** — Battery voltage/current tracking with low-power warning and auto-screensaver notifications
 - **Physical Button** — Boot mode control & emergency actions
 - **Multi-level Menus** — Organize commands in nested folders
-- **Scenario Sequences** — Chain multiple actions per menu item
+- **Scenario Pipelines** — Chain multiple actions with loop/toggle support
+
+**For Developers:** Pico Commander isn't a framework you configure around, and it's not a library you import — think of it as an **automation skeleton** or **trigger-pipeline sequencer**. It's a small runtime (**Input → Pipeline → Output**) that ships with working modules already wired in: Hall sensors, battery monitor, HID keyboard emulation, GPIO control for relays and optocouplers. The contract between modules is simple enough that adding your own input or output type doesn't require touching the core loop — just drop in a new handler class and reference it in `config.json`.
+
+See [Pipelines Guide](docs/user/pipelines.md) for how Input → Pipeline → Output actually fits together.
 
 ---
 
@@ -58,34 +63,11 @@
 
 ---
 
-### Navigation & Execution Demo
-
-![Menu Navigation](assets/scenario-execution.gif)
-
-*Live demonstration of menu navigation and command execution*
-
----
-
 ### Video Demonstration
 
 **Full Video Demo**: [Watch on YouTube](https://youtu.be/huUQviQJ-Cw)
 
 ---
-
-## 🔄 Comparison with Alternatives
-
-| Feature | Pico Commander | Stream Deck | DIY Arduino | SSH Aliases |
-|---------|----------------|-------------|-------------|-------------|
-| **Cost** | ~$15 | $150+ | ~$20 | Free |
-| **Display** | 128×32 OLED | Color LCD | None (typical) | Terminal only |
-| **Visual Feedback** | Yes | Yes | No | No |
-| **Programming** | JSON config | Proprietary software | C++ code | Bash scripting |
-| **Portability** | Any OS via USB HID | Windows/Mac only | Any OS via USB HID | SSH access required |
-| **Menu Navigation** | Yes (hierarchical) | Grid layout | N/A | Command memory |
-| **Extensibility** | Open source | Closed ecosystem | Full control | Script-based |
-| **Setup Time** | 10 minutes | 30 minutes | 1-2 hours | Varies |
-| **Emergency Triggers** | Hall sensors | No | Possible | No |
-| **Offline Operation** | Yes | Yes | Yes | No |
 
 **Use Pico Commander when**:
 - You need physical control without SSH
@@ -109,6 +91,7 @@
 - **Configurable Menu System** — JSON-based hierarchical menus
 - **Action Sequences** — Toggle services (start/stop) with single click
 - **Emergency Triggers** — Hall sensor activation for critical scenarios
+- **Battery Monitoring** — INA226-based voltage/current tracking with configurable low-battery warnings and screensaver notifications
 - **Screen Management** — Auto-sleep and customizable screensavers (Tesseract, Starfield, Matrix)
 - **State Persistence** — Remembers menu position and sequence states
 
@@ -116,6 +99,7 @@
 - **Cooldown Protection** — Prevents accidental double-execution (configurable)
 - **Priority System** — Hall sensors bypass cooldown for emergency actions
 - **Debouncing** — Hardware and software anti-bounce for all inputs
+- **Low-Battery Warning** — Blinking OLED alert with encoder-dismiss and cooldown protection (configurable)
 - **USB Detection** — Skips scenarios when USB is disconnected
 
 ---
@@ -135,16 +119,18 @@
 │  └──────────────┘       │ SW  ─── GP8  │      └─────────────┘ │
 │                         └──────────────┘                        │
 │                                                                 │
-│  ┌──────────────┐       ┌──────────────┐                       │
-│  │ Button       │       │ LED          │                       │
-│  │ GP24 (boot)  │       │ GP25 (onboard)│                      │
-│  └──────────────┘       └──────────────┘                       │
-│                                                                 │
-│  USB ←──── HID Keyboard Output                                 │
+│  ┌──────────────┐       ┌──────────────┐      ┌─────────────┐ │
+│  │ Button       │       │ LED          │      │ GPIO Output │ │
+│  │ GP24 (boot)  │       │ GP25 (onboard)│     │ GP14 (opt.) │ │
+│  └──────────────┘       └──────────────┘      └─────────────┘ │
+│                                                     │           │
+│  USB ←──── HID Keyboard Output                     └─→ Relay/  │
+│                                                        Opto     │
 └─────────────────────────────────────────────────────────────────┘
 
 Power: 5V via USB
 Typical Current: <100mA (OLED on), <5mA (screen off)
+Note: GPIO output (optional) for controlling relays, optocouplers, or power buttons
 ```
 
 ### 📦 Required Components
@@ -153,9 +139,10 @@ Typical Current: <100mA (OLED on), <5mA (screen off)
 | Microcontroller | Raspberry Pi Pico | RP2040-based board |
 | Display | SSD1306 OLED 128×32 | I2C interface (0x3C) |
 | Encoder | KY-040 Rotary Encoder | With push button |
-| Hall Sensors | Hall Effect Sensors (×2) | Active-low or active-high |
+| Hall Sensors | Hall Effect Sensors (×2) | Active-low or active-high (optional) |
 | Button | Tactile Switch | For boot mode selection |
 | LED | (Optional) | Built-in LED on GP25 |
+| GPIO Output Module | Relay / Optocoupler | For power control automation (optional) |
 
 ---
 
@@ -298,9 +285,16 @@ config.py            # Configuration loader
 config.json          # Menu & scenarios configuration
 display.py           # OLED display manager
 encoder.py           # Rotary encoder handler
-passive.py           # Hall sensors & button handler
-trigger_bus.py       # Scenario execution engine
-screensaver.py       # Screensaver effects
+inputs_manager.py    # Unified input handlers (Hall, INA226, button)
+output_base.py       # Base class for output modules
+output_hid.py        # USB HID keyboard output
+output_gpio.py       # GPIO output (relays, optocouplers)
+trigger_bus.py       # Pipeline execution engine
+screensaver.py       # Screensaver effects (Tesseract, Starfield, Matrix)
+ina226_monitor.py    # INA226 power monitor driver
+splash_screen.py     # Battery status HUD overlay
+splash_trigger.py    # Splash screen interval timer
+warning_screen.py    # Low-battery warning overlay
 ```
 
 **Manual Copy:**
@@ -334,9 +328,16 @@ CIRCUITPY/
 ├── config.json
 ├── display.py
 ├── encoder.py
-├── passive.py
-├── screensaver.py
+├── inputs_manager.py
+├── output_base.py
+├── output_hid.py
+├── output_gpio.py
 ├── trigger_bus.py
+├── screensaver.py
+├── ina226_monitor.py
+├── splash_screen.py
+├── splash_trigger.py
+├── warning_screen.py
 ├── lib/
 │   ├── adafruit_displayio_ssd1306.mpy
 │   ├── adafruit_display_text/
@@ -412,17 +413,34 @@ Check critical settings in `config.json`:
 
 ```json
 {
+  "inputs": {
+    "hall_sensor_1": {
+      "type": "hall",
+      "pin": 15,
+      "active_low": true
+    }
+  },
+  "outputs": {
+    "hid": {
+      "type": "hid",
+      "enabled": true
+    },
+    "opto_pwr": {
+      "type": "gpio",
+      "pin": 14,
+      "enabled": true
+    }
+  },
   "hardware": {
-    "encoder_clk": 6,    // Verify pins match your wiring
+    "encoder_clk": 6,
     "encoder_dt": 7,
     "encoder_sw": 8,
     "display_sda": 4,
-    "display_scl": 5,
-    // ... other pins
+    "display_scl": 5
   },
   "device": {
-    "armed": true,        // Enable Hall sensors
-    "cooldown_ms": 5000,  // Anti-spam protection
+    "armed": true,
+    "cooldown_ms": 5000,
     "screen_timeout_s": 15
   }
 }
@@ -439,7 +457,7 @@ Pico Commander has two boot modes:
 | Mode | How to Enter | Purpose |
 |------|--------------|---------|
 | **Normal Mode** | Boot without pressing GP24 button | Runtime operation - file system writable from code |
-| **Development Mode** | Hold GP24 button during boot | File editing - USB drive writable, code read-only |
+| **Development Mode** | Hold GP24 button during boot, OR use REPL `storage.remount()` | File editing - USB drive writable, code read-only |
 
 **6.2. Test Boot**
 
@@ -455,11 +473,37 @@ Pico Commander has two boot modes:
 
 **6.3. Enter Development Mode (for editing files)**
 
+**Method 1: Hardware Button (Recommended)**
 1. Disconnect Pico
 2. Hold **GP24 button**
 3. Connect to USB while holding button
 4. Release button
 5. CIRCUITPY drive is now writable for editing files
+
+**Method 2: Software via REPL (Alternative)**
+
+If you can't physically access the GP24 button, use REPL to remount filesystem:
+
+1. Connect to Pico's serial console (screen, minicom, Mu editor, or Thonny)
+2. Press `Ctrl+C` to interrupt running code and enter REPL
+3. Run this code:
+
+```python
+import storage
+storage.remount("/", readonly=False)
+# Now you can edit files via REPL or use storage.erase_filesystem() if needed
+```
+
+4. To make filesystem writable on next boot, modify `boot.py`:
+
+```python
+with open("/boot.py", "a") as f:
+    f.write('\n# Enable USB write access\nimport storage\nstorage.remount("/", readonly=False)\n')
+import microcontroller
+microcontroller.reset()
+```
+
+**Warning**: Making filesystem always writable from USB reduces safety (code can't reliably write `state.json`). Use Method 1 when possible.
 
 **Note**: In Normal Mode, `state.json` is auto-created for saving menu position and sequence states.
 
@@ -480,8 +524,8 @@ Create a simple test scenario:
 ```json
 "scenarios": {
   "test_hello": [
-    {"action": "type", "value": "Hello from Pico Commander!"},
-    {"action": "key", "combo": "enter"}
+    {"output": "hid", "action": "type", "value": "Hello from Pico Commander!"},
+    {"output": "hid", "action": "key", "combo": "enter"}
   ]
 }
 ```
@@ -492,9 +536,8 @@ Add menu item:
   {
     "id": "test_item",
     "label": "Test Hello",
-    "sequence": [
-      {"scenario": "test_hello", "name": "Run"}
-    ]
+    "pipeline": ["test_hello"],
+    "loop": false
   }
 ]
 ```
@@ -569,48 +612,80 @@ Use `editor.html` for a graphical configuration interface with drag-and-drop men
 
 ### Manual Configuration
 
-### Basic Menu Item
+#### Basic Menu Item
 ```json
 {
   "id": "docker_service",
   "label": "Docker App",
-  "sequence": [
-    {"scenario": "docker_stop", "name": "Stop"},
-    {"scenario": "docker_start", "name": "Start"}
-  ]
+  "pipeline": [
+    {"scenario": "scenario_docker_stop", "label": "Stop"},
+    {"scenario": "scenario_docker_start", "label": "Start"}
+  ],
+  "loop": true
 }
 ```
 
-### Nested Submenu
+**Notes:**
+- `pipeline`: Array of scenarios to execute
+- `loop: true`: Toggle mode — each click cycles through pipeline (Stop → Start → Stop...)
+- `loop: false`: Chain mode — executes entire pipeline in one click
+
+#### Nested Submenu
 ```json
 {
   "id": "servers",
   "label": "Servers",
   "submenu": [
-    {"id": "web", "label": "Web Server", "sequence": [...]}
+    {
+      "id": "web",
+      "label": "Web Server",
+      "pipeline": ["scenario_restart_web"],
+      "loop": false
+    }
   ]
 }
 ```
 
-### Scenario Example
+#### Scenario Example
 ```json
 "scenarios": {
-  "docker_stop": [
-    {"action": "enter", "count": 3},
-    {"action": "wait", "ms": 200},
-    {"action": "type", "value": "docker-compose stop"},
-    {"action": "key", "combo": "enter"}
+  "scenario_docker_stop": [
+    {"output": "hid", "action": "enter", "count": 3},
+    {"wait": 200},
+    {"output": "hid", "action": "type", "value": "docker-compose stop"},
+    {"output": "hid", "action": "key", "combo": "enter"}
+  ],
+  "scenario_test_gpio": [
+    {"output": "hid", "action": "type", "value": "Pressing power button..."},
+    {"output": "hid", "action": "key", "combo": "enter"},
+    {"wait": 500},
+    {"output": "opto_pwr", "action": "gpio_pulse"},
+    {"wait": 500},
+    {"output": "hid", "action": "type", "value": "Done!"},
+    {"output": "hid", "action": "key", "combo": "enter"}
   ]
 }
 ```
 
+**Notes:**
+- Each step specifies `"output"` field (defaults to `"hid"` if omitted for backward compatibility)
+- HID and GPIO actions can be freely mixed in one scenario (see `scenario_test_gpio` example)
+- `{"wait": ms}` pauses execution between steps
+
 ### Supported Actions
-| Action | Description | Parameters |
-|--------|-------------|------------|
-| `type` | Type text | `value` |
-| `key` | Press key combo | `combo` (e.g., "ctrl+c") |
-| `wait` | Delay | `ms` (milliseconds) |
-| `enter` | Press Enter N times | `count` |
+
+| Action | Output | Description | Parameters |
+|--------|--------|-------------|------------|
+| `type` | `hid` | Type text string | `value` (string) |
+| `key` | `hid` | Press key combination | `combo` (e.g., "ctrl+c", "super+l") |
+| `enter` | `hid` | Press Enter N times | `count` (number, default: 1) |
+| `wait` | — | Pause execution | `ms` (milliseconds) or `wait` (alias) |
+| `gpio_pulse` | `gpio` | Short pulse (250ms) | None (fixed duration) |
+| `gpio_set` | `gpio` | Set pin to HIGH/LOW | `value: "high"` or `"low"` |
+| `gpio_hold` | `gpio` | Hold HIGH for duration | `duration_ms` (milliseconds) |
+
+**Multi-Output Scenarios:**  
+See `scenario_test_opto_pulse` in the included `config.json` for a real example of mixing HID keyboard output (status messages) with GPIO output (physical button press) in a single scenario.
 
 ---
 
@@ -626,7 +701,7 @@ Use `editor.html` for a graphical configuration interface with drag-and-drop men
 | Mode | How to Enter | Behavior |
 |------|--------------|----------|
 | **Normal** | Boot without button pressed | File system writable from code, USB read-only |
-| **Development** | Hold GP24 button during boot | File system writable from USB, read-only from code |
+| **Development** | Hold GP24 during boot OR REPL `storage.remount()` | File system writable from USB, read-only from code |
 
 ---
 
@@ -642,20 +717,30 @@ Use `editor.html` for a graphical configuration interface with drag-and-drop men
 
 ## 📁 Project Structure
 
-```
-pico-comander/
-├── code.py              # Main loop & menu logic
-├── boot.py              # USB HID initialization
-├── config.py            # Config/state loader
-├── config.json          # Menu & scenario definitions
-├── display.py           # SSD1306 OLED driver
-├── encoder.py           # KY-040 rotary encoder
-├── passive.py           # Hall sensors & button handler
-├── trigger_bus.py       # Scenario execution engine
-├── screensaver.py       # Screensaver effects
-├── editor.html          # Web-based config editor
-└── lib/                 # CircuitPython libraries
-```
+| File | Purpose |
+|------|---------|
+| `boot.py` | USB HID initialization and boot mode configuration |
+| `code.py` | Main application loop — menu navigation, encoder handling, display updates |
+| `config.py` | Configuration and state file loader/saver |
+| `config.json` | User configuration — inputs, outputs, menus, scenarios, hardware pins |
+| `display.py` | OLED display manager (SSD1306) with menu rendering and screensaver support |
+| `encoder.py` | Rotary encoder handler (KY-040) with debouncing and event callbacks |
+| `inputs_manager.py` | Unified input sensor manager — Hall sensors, INA226 power monitor, button |
+| `output_base.py` | Base class for output modules (extensibility contract) |
+| `output_hid.py` | USB HID keyboard output handler — types text and key combinations |
+| `output_gpio.py` | GPIO output handler — controls relays, optocouplers, physical buttons |
+| `trigger_bus.py` | Pipeline execution engine — routes scenario steps to appropriate outputs |
+| `screensaver.py` | Screensaver animations — Tesseract, Starfield, Matrix effects |
+| `ina226_monitor.py` | INA226 power monitor I2C driver — voltage/current/battery percentage |
+| `ina226_debug.py` | INA226 diagnostic utility for I2C troubleshooting |
+| `splash_screen.py` | Battery status HUD overlay during screensaver with animated percentage |
+| `splash_trigger.py` | Timer for periodic splash screen display during idle periods |
+| `warning_screen.py` | Low-battery warning overlay with blinking alert and encoder dismiss |
+| `editor.html` | Web-based Config Studio — visual editor for config.json with drag-and-drop |
+| `settings.toml.example` | Example CircuitPython settings file for WiFi/environment config |
+| `lib/` | CircuitPython libraries (Adafruit HID, display drivers) |
+
+Each input/output type follows a small extensible contract — see [Inputs](docs/developers/inputs.md) and [Outputs](docs/developers/outputs.md) developer guides if you want to add your own.
 
 ---
 

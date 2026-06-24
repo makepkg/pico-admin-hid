@@ -81,3 +81,6 @@ assets/VID_*
 !assets/device-in-action.jpg
 !assets/html-ui-instrument.png
 !assets/scenario-execution.gif
+
+# Private files
+private/

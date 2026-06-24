@@ -9,6 +9,8 @@ Complete guide to `config.json` structure, principles, and best practices.
 - [Overview](#overview)
 - [File Structure](#file-structure)
 - [Hardware Section](#hardware-section)
+- [Inputs Section](#inputs-section)
+- [Outputs Section](#outputs-section)
 - [Device Section](#device-section)
 - [Passive Section](#passive-section)
 - [Active Menu Section](#active-menu-section)
@@ -17,6 +19,7 @@ Complete guide to `config.json` structure, principles, and best practices.
 - [Validation Rules](#validation-rules)
 - [Best Practices](#best-practices)
 - [Examples](#examples)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -26,10 +29,10 @@ Complete guide to `config.json` structure, principles, and best practices.
 
 `config.json` is the central configuration file that defines:
 - Hardware pin assignments
+- Input sensors and Output targets
 - Device behavior settings
 - Menu structure and navigation
-- Automation scenarios
-- Trigger bindings
+- Automation scenarios and pipeline bindings
 
 ### Configuration Principles
 
@@ -43,7 +46,7 @@ Complete guide to `config.json` structure, principles, and best practices.
 
 | File | Purpose | Writable From |
 |------|---------|---------------|
-| `config.json` | Static configuration | USB (dev mode) or editor |
+| `config.json` | Static configuration | USB (dev mode) or Config Studio |
 | `state.json` | Runtime state (auto-generated) | Code (normal mode) |
 | `boot_out.txt` | CircuitPython info (auto-generated) | System |
 
@@ -55,39 +58,36 @@ Complete guide to `config.json` structure, principles, and best practices.
 
 ### Top-Level Schema
 
+The configuration file must contain the following 7 top-level keys:
+
 ```json
 {
-  "hardware": { },      // Pin assignments for all components
-  "device": { },        // Behavior settings (cooldown, timeouts)
-  "passive": { },       // Trigger → Scenario bindings
-  "active_menu": [ ],   // Menu hierarchy array
-  "scenarios": { }      // Scenario name → steps mapping
+  "hardware": { },      // Basic UI/system pin assignments (encoder, display, button)
+  "inputs": { },        // Hardware sensors (Hall, INA226) configuration
+  "outputs": { },       // Action targets (USB HID, GPIO pins)
+  "device": { },        // Global behavior settings (cooldown, timeouts)
+  "passive": { },       // Sensor/Button bindings to scenario pipelines
+  "active_menu": [ ],   // Rotary encoder menu hierarchy
+  "scenarios": { }      // Definitions of steps to execute
 }
 ```
 
-All five sections are **required**. Empty sections must use `{}` or `[]`.
+Empty sections must use `{}` or `[]`.
 
 ---
 
 ## Hardware Section
 
 ### Purpose
-
-Defines GPIO pin assignments for all physical components.
+Defines GPIO pin assignments for the core UI and system components. 
+*(Note: Sensors like Hall effect or INA226 are now configured in the [Inputs Section](#inputs-section)).*
 
 ### Schema
 
 ```json
 "hardware": {
-  "hall_sensors": [
-    {
-      "id": "string",          // Unique identifier
-      "pin": number,           // GPIO pin number
-      "active_low": boolean    // Logic level (true/false)
-    }
-  ],
-  "button_pin": number,        // Boot button pin
-  "led_pin": number,           // Status LED pin
+  "button_pin": number,        // Boot button pin (GP24)
+  "led_pin": number,           // Status LED pin (GP25)
   "encoder_clk": number,       // Encoder clock pin
   "encoder_dt": number,        // Encoder data pin
   "encoder_sw": number,        // Encoder switch pin
@@ -96,184 +96,157 @@ Defines GPIO pin assignments for all physical components.
 }
 ```
 
-### Hall Sensors
+### Default Assignments
+```json
+"hardware": {
+  "button_pin": 24,
+  "led_pin": 25,
+  "encoder_clk": 6,
+  "encoder_dt": 7,
+  "encoder_sw": 8,
+  "display_sda": 4,
+  "display_scl": 5
+}
+```
 
-**Multiple sensors supported** (array):
+---
+
+## Inputs Section
+
+### Purpose
+Defines hardware sensors that can generate passive triggers.
+
+### Schema Structure
+```json
+"inputs": {
+  "input_id": { ... }
+}
+```
+The key (`"input_id"`) acts as the unique identifier used later in the `passive` section.
+
+### 1. Hall Sensors
+Detects magnetic field proximity (typically used for emergency triggers like opening a case).
 
 ```json
-"hall_sensors": [
-  {
-    "id": "hall_sensor_1",
+"inputs": {
+  "hall_sensor_1": {
+    "type": "hall",
     "pin": 15,
     "active_low": true
-  },
-  {
-    "id": "hall_sensor_2",
-    "pin": 16,
-    "active_low": true
   }
-]
+}
 ```
+- `type`: Must be `"hall"`.
+- `pin`: GPIO pin number.
+- `active_low`: `true` means the sensor pulls the pin LOW when the magnet is present.
 
-**Properties**:
-- `id` (string, required) — Unique identifier used in `passive` section
-- `pin` (number, required) — GPIO pin number (0-29 for Pico)
-- `active_low` (boolean, required) — Signal logic:
-  - `true` — Sensor pulls LOW when triggered (common with pull-up resistors)
-  - `false` — Sensor pulls HIGH when triggered (less common)
+### 2. Power Monitor (INA226)
+Monitors battery voltage/current over I2C and fires a trigger when battery is critically low.
 
-**Pin Selection**:
-- Use any free GPIO pin
-- Avoid pins used by I2C (GP4, GP5 by default)
-- Avoid pins used by encoder (GP6, GP7, GP8 by default)
-- Standard pins: GP15, GP16 (not used by other components)
-
-### Other Hardware Pins
-
-**Default Assignments**:
 ```json
-"button_pin": 24,      // GP24 (boot button on Pico)
-"led_pin": 25,         // GP25 (onboard LED)
-"encoder_clk": 6,      // GP6
-"encoder_dt": 7,       // GP7
-"encoder_sw": 8,       // GP8
-"display_sda": 4,      // GP4 (I2C0 SDA)
-"display_scl": 5       // GP5 (I2C0 SCL)
+"inputs": {
+  "ina226": {
+    "type": "power_monitor",
+    "enabled": true,
+    "trigger_mode": "percent",
+    "threshold_percent": 15,
+    "threshold_voltage": 16.5,
+    "warning_offset_percent": 5,
+    "cooldown_sec": 300,
+    "cancel_cooldown_sec": 3600,
+    "read_interval_sec": 5.0,
+    "warning_enabled": true,
+    "warning_blink_interval": 0.5,
+    "warning_canceled_display_sec": 2.0,
+    "splash_interval_sec": 30,
+    "splash_duration_sec": 6,
+    "battery_max_v": 21.0,
+    "battery_min_v": 15.0,
+    "shunt_ohms": 0.1,
+    "i2c_address": 64
+  }
+}
+```
+- `type`: Must be `"power_monitor"`.
+- `trigger_mode`: `"percent"` or `"voltage"`.
+- `warning_offset_percent`: Adds this value to the threshold to show a warning *before* triggering. (e.g., if threshold is 15%, warning starts at 20%).
+- `cooldown_sec`: Cooldown applied after the trigger fires.
+- `cancel_cooldown_sec`: Cooldown applied if the user manually cancels the shutdown.
+- `splash_duration_sec`: How long the battery HUD stays on screen during screensaver.
+
+---
+
+## Outputs Section
+
+### Purpose
+Defines the targets where scenario actions are executed.
+
+### Schema Structure
+```json
+"outputs": {
+  "output_name": { ... }
+}
 ```
 
-**Changing Pins**:
-- Verify hardware wiring matches new assignments
-- Encoder: CLK/DT can be swapped if rotation direction inverted
-- Display: Must use I2C-capable pins (GP0/GP1, GP2/GP3, GP4/GP5, etc.)
+### 1. HID Output
+Sends keystrokes to the connected host computer via USB.
 
-### Hardware Validation
+```json
+"outputs": {
+  "hid": {
+    "type": "hid",
+    "enabled": true,
+    "usb_layout": "us"
+  }
+}
+```
 
-**Rules**:
-1. All pin numbers must be 0-29 (Pico GPIO range)
-2. No duplicate pin assignments (each pin used once)
-3. Sensor IDs must be unique
-4. I2C pins must be valid I2C pairs
+### 2. GPIO Output
+Controls a physical digital pin (e.g., relay, optocoupler).
+
+```json
+"outputs": {
+  "opto_pwr": {
+    "type": "gpio",
+    "enabled": true,
+    "pin": 14,
+    "active_high": true,
+    "label": "PC Power Button",
+    "default_scenario": "scenario_opto_pwr_pulse"
+  }
+}
+```
+- `type`: Must be `"gpio"`.
+- `active_high`: Defines the electrical level for the "active" state.
+- `default_scenario`: A UI convention used by Config Studio to auto-generate a 1-step scenario for this output.
+
+### 3. Auto-Boot (Inside GPIO Output)
+Automatically pulses a GPIO pin if the USB connection is not detected after boot.
+*(Note: Supported on only **one** GPIO output at a time).*
+
+```json
+"outputs": {
+  "opto_pwr": {
+    "type": "gpio",
+    "pin": 14,
+    "auto_boot": {
+      "enabled": true,
+      "check_interval_s": 15,
+      "max_attempts": 2,
+      "retry_cooldown_min": 5
+    }
+  }
+}
+```
 
 ---
 
 ## Device Section
 
 ### Purpose
-
-Controls device-wide behavior and timing parameters.
+Controls global device behavior and timing parameters.
 
 ### Schema
-
-```json
-"device": {
-  "armed": boolean,               // Enable/disable Hall sensors
-  "debounce_ms": number,          // Anti-bounce delay (milliseconds)
-  "cooldown_ms": number,          // Anti-spam delay (milliseconds)
-  "screen_timeout_s": number,     // Screen sleep timeout (seconds)
-  "screensaver": "string"         // Screensaver mode
-}
-```
-
-### Properties
-
-#### `armed` (boolean)
-
-**Purpose**: Master switch for Hall sensor triggers
-
-**Values**:
-- `true` — Hall sensors fire scenarios when triggered
-- `false` — Hall sensors monitored but don't execute scenarios (safety mode)
-
-**Use Cases**:
-- `false` during maintenance/testing
-- `false` when sensors wired but not configured
-- `true` for production use
-
-**Example**:
-```json
-"armed": true
-```
-
-#### `debounce_ms` (number)
-
-**Purpose**: Anti-bounce delay for Hall sensors
-
-**Range**: 50-1000 ms (typical: 300 ms)
-
-**Behavior**: After Hall sensor state changes, wait this duration before confirming trigger. Prevents false triggers from:
-- Reed switch mechanical bounce
-- Magnetic field fluctuations
-- Electrical noise
-
-**Values**:
-- Lower (100-200 ms) — Faster response, more false triggers
-- Higher (500-1000 ms) — Slower response, fewer false triggers
-
-**Example**:
-```json
-"debounce_ms": 300
-```
-
-#### `cooldown_ms` (number)
-
-**Purpose**: Minimum time between scenario executions
-
-**Range**: 1000-10000 ms (typical: 5000 ms)
-
-**Behavior**: After scenario completes, reject all NORMAL priority triggers until cooldown expires. Prevents:
-- Accidental double-clicks
-- Encoder bounce
-- Rapid repeated execution
-
-**Priority Override**: HIGH priority triggers (Hall sensors) bypass cooldown.
-
-**Values**:
-- Lower (1000-3000 ms) — Allow rapid successive commands
-- Higher (5000-10000 ms) — Prevent accidental multi-execution
-
-**Example**:
-```json
-"cooldown_ms": 5000
-```
-
-#### `screen_timeout_s` (number)
-
-**Purpose**: Auto-sleep timeout in seconds
-
-**Range**: 0 (disabled) or 5-300 seconds
-
-**Behavior**:
-- `0` — Screen never sleeps
-- `> 0` — After timeout with no interaction, screen sleeps or screensaver starts
-
-**Sleep vs Screensaver**: Determined by `screensaver` setting:
-- `screensaver: "off"` → Screen turns off (blank)
-- `screensaver: "tesseract"` → Animation plays
-
-**Example**:
-```json
-"screen_timeout_s": 15
-```
-
-#### `screensaver` (string)
-
-**Purpose**: Screen behavior after timeout
-
-**Values**:
-- `"off"` — Screen turns black (saves power)
-- `"tesseract"` — 4D hypercube rotation animation
-- `"starfield"` — 3D starfield movement
-- `"matrix"` — Matrix-style falling characters
-
-**Performance**: Animations use ~5-10% CPU at 20 FPS.
-
-**Example**:
-```json
-"screensaver": "tesseract"
-```
-
-### Complete Device Example
-
 ```json
 "device": {
   "armed": true,
@@ -283,108 +256,76 @@ Controls device-wide behavior and timing parameters.
   "screensaver": "tesseract"
 }
 ```
+- `armed`: Master switch for Hall sensor triggers.
+- `debounce_ms`: Anti-bounce delay for sensors.
+- `cooldown_ms`: Global cooldown between active scenario executions to prevent spam.
+- `screen_timeout_s`: Seconds of inactivity before screen sleeps or screensaver starts.
+- `screensaver`: `"off"`, `"tesseract"`, `"starfield"`, or `"matrix"`.
 
 ---
 
 ## Passive Section
 
 ### Purpose
-
-Binds hardware triggers to scenario names.
+Binds hardware input IDs to scenario pipelines.
 
 ### Schema
-
 ```json
 "passive": {
-  "trigger_id": "scenario_name",
-  "hall_sensor_1": "scenario_shutdown",
-  "hall_sensor_2": "scenario_alarm",
-  "btn_double": "scenario_lock"
+  "hall_sensor_1": {
+    "pipeline": ["scenario_emergency_shutdown"],
+    "loop": false
+  },
+  "btn_double": {
+    "pipeline": ["scenario_lock_screen"],
+    "loop": false
+  }
 }
 ```
 
-### Trigger Types
+**Pipeline execution modes**:
+- `loop: false` — Executes the entire list of scenarios sequentially at once.
+- `loop: true` — Executes exactly one scenario per trigger event, advancing to the next one on the next trigger.
 
-| Trigger ID | Source | Priority |
-|------------|--------|----------|
-| `hall_sensor_*` | Hall sensor activation | HIGH (bypasses cooldown) |
-| `btn_double` | Button double-click | NORMAL (respects cooldown) |
-
-**Hall sensor IDs** must match `hardware.hall_sensors[].id`.
-
-### Binding Rules
-
-1. **Key** = Trigger ID (from hardware or built-in)
-2. **Value** = Scenario name (must exist in `scenarios` section)
-3. Missing trigger = No action on activation
-4. Invalid scenario name = Error logged, no crash
-
-### Examples
-
-**Hall Sensor Emergency Shutdown**:
-```json
-"passive": {
-  "hall_sensor_1": "scenario_emergency_shutdown"
-}
-```
-
-**Button Lock Screen**:
-```json
-"passive": {
-  "btn_double": "scenario_lock_screen"
-}
-```
-
-**Multiple Triggers**:
-```json
-"passive": {
-  "hall_sensor_1": "scenario_shutdown",
-  "hall_sensor_2": "scenario_alert",
-  "btn_double": "scenario_lock"
-}
-```
-
-**No Bindings** (disable triggers):
-```json
-"passive": {}
-```
+*(Note: The legacy string format `"hall_sensor_1": "scenario_name"` is still supported for backward compatibility, but the `pipeline` object is the modern standard).*
 
 ---
 
 ## Active Menu Section
 
 ### Purpose
-
 Defines hierarchical menu structure for encoder navigation.
 
 ### Schema
-
 ```json
 "active_menu": [
   {
-    "id": "string",           // Unique identifier (required)
-    "label": "string",        // Display text (required)
-    "sequence": [ ],          // Action sequence (optional)
-    "submenu": [ ]            // Nested items (optional)
+    "id": "string",
+    "label": "string",
+    "pipeline": [ ],
+    "loop": boolean,
+    "submenu": [ ]
   }
 ]
 ```
 
 ### Item Types
 
-**Action Item** (has sequence):
+**1. Action Item** (executes scenarios):
 ```json
 {
   "id": "docker_service",
   "label": "Docker App",
-  "sequence": [
-    {"scenario": "docker_stop", "name": "Stop"},
-    {"scenario": "docker_start", "name": "Start"}
-  ]
+  "pipeline": [
+    {"scenario": "docker_stop", "label": "Stop"},
+    {"scenario": "docker_start", "label": "Start"}
+  ],
+  "loop": true
 }
 ```
+*(With `loop: true`, each click toggles to the next scenario).*
 
-**Folder Item** (has submenu):
+**2. Folder Item** (nested menu):
 ```json
 {
   "id": "servers",
@@ -393,526 +334,146 @@ Defines hierarchical menu structure for encoder navigation.
     {
       "id": "web_server",
       "label": "Web Server",
-      "sequence": [...]
+      "pipeline": ["web_start"],
+      "loop": false
     }
   ]
 }
 ```
 
-**Hybrid Item** (has both):
+**3. Hybrid Item** (executes then opens folder):
 ```json
 {
   "id": "refresh_folder",
   "label": "Monitoring",
-  "sequence": [
-    {"scenario": "refresh_status", "name": "Refresh"}
+  "pipeline": [
+    {"scenario": "refresh_status", "label": "Refresh"}
   ],
-  "submenu": [...]
+  "loop": false,
+  "submenu": [ ... ]
 }
 ```
-Clicking executes sequence, then opens submenu.
-
-### Item Properties
-
-#### `id` (string, required)
-
-**Purpose**: Unique identifier for the item
-
-**Rules**:
-- Must be unique across entire menu tree
-- Use lowercase, numbers, underscores: `a-z`, `0-9`, `_`
-- No spaces or special characters
-- Length: 3-50 characters
-
-**Used For**:
-- State persistence (remembering sequence position)
-- Recursive item search in trigger bus
-
-**Examples**:
-- Good: `"docker_nextcloud"`, `"server_1"`, `"backup_daily"`
-- Bad: `"Docker-Nextcloud"`, `"server #1"`, `"backup daily"`
-
-#### `label` (string, required)
-
-**Purpose**: Text shown on OLED display
-
-**Rules**:
-- Max 21 characters (display width limitation)
-- Can include spaces and special characters
-- Longer text truncated with `~` (e.g., `Very Long Label Name~`)
-
-**Examples**:
-- `"Docker Service"`
-- `"🔒 Lock Screen"`
-- `"Backup → Cloud"`
-
-#### `sequence` (array, optional)
-
-**Purpose**: Defines actions executed on click
-
-**Format**: Array of sequence entries
-
-**Sequence Entry Formats**:
-
-**Simple Format** (string):
-```json
-"sequence": ["scenario_name"]
-```
-Display name = scenario name
-
-**Detailed Format** (object):
-```json
-"sequence": [
-  {
-    "scenario": "scenario_name",
-    "name": "Display Name"
-  }
-]
-```
-Custom display name for next action preview
-
-**Toggle Pattern** (multiple entries):
-```json
-"sequence": [
-  {"scenario": "service_stop", "name": "Stop"},
-  {"scenario": "service_start", "name": "Start"}
-]
-```
-Clicking cycles through: Stop → Start → Stop → ...
-
-**Multi-Action Pattern**:
-```json
-"sequence": [
-  {"scenario": "service_stop", "name": "Stop"},
-  {"scenario": "service_start", "name": "Start"},
-  {"scenario": "service_restart", "name": "Restart"},
-  {"scenario": "service_status", "name": "Status"}
-]
-```
-Cycles through all actions: Stop → Start → Restart → Status → Stop → ...
-
-#### `submenu` (array, optional)
-
-**Purpose**: Nested menu items (folder contents)
-
-**Format**: Array of menu items (same schema as parent)
-
-**Nesting**: Theoretically unlimited, practically 2-4 levels recommended
-
-**Example**:
-```json
-{
-  "id": "servers",
-  "label": "Servers",
-  "submenu": [
-    {
-      "id": "web",
-      "label": "Web Server",
-      "sequence": [...]
-    },
-    {
-      "id": "database",
-      "label": "Database",
-      "submenu": [
-        {
-          "id": "mysql",
-          "label": "MySQL",
-          "sequence": [...]
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Navigation Behavior
-
-**Rotation**:
-- Right → Next item (wraps to first)
-- Left → Previous item (wraps to last)
-
-**Click**:
-- Action item → Execute sequence
-- Folder item → Enter submenu
-- Hybrid item → Execute, then enter submenu
-
-**Long Press** (≥1 second):
-- Navigate back to parent menu
-- At root → Show status message
 
 ---
 
 ## Scenarios Section
 
 ### Purpose
-
-Maps scenario names to command sequences.
+Maps scenario names to command steps. Each step can target a specific `output`.
 
 ### Schema
-
 ```json
 "scenarios": {
   "scenario_name": [
     {
+      "output": "string",    // Target output (default: "hid")
       "action": "string",    // Action type
-      // ...action-specific parameters
+      // ...parameters
     }
   ]
 }
 ```
 
-### Action Types
+### Action Types (HID Output)
 
-#### 1. `type` — Type Text
+- `type`: Types text.
+  ```json
+  {"output": "hid", "action": "type", "value": "docker-compose up"}
+  ```
+- `key`: Presses key combinations.
+  ```json
+  {"output": "hid", "action": "key", "combo": "ctrl+c"}
+  ```
+- `enter`: Presses the Enter key `count` times (1-10).
+  ```json
+  {"output": "hid", "action": "enter", "count": 3}
+  ```
 
-**Purpose**: Types a string character by character
+### Action Types (GPIO Output)
 
-**Parameters**:
-- `value` (string, required) — Text to type
+- `gpio_pulse`: 250ms pulse (simulates a button press).
+  ```json
+  {"output": "opto_pwr", "action": "gpio_pulse"}
+  ```
+- `gpio_hold`: Hold active state for `duration_ms`.
+  ```json
+  {"output": "opto_pwr", "action": "gpio_hold", "duration_ms": 1000}
+  ```
+- `gpio_set`: Sets raw electrical level (`"high"`/`"low"`), bypassing `active_high`.
+  ```json
+  {"output": "opto_pwr", "action": "gpio_set", "value": "high"}
+  ```
 
-**Example**:
+### Pause Execution
+Use the short-hand `wait` command to pause between steps.
 ```json
-{"action": "type", "value": "docker-compose restart"}
+{"wait": 500}
 ```
-
-**Behavior**:
-- Types one character at a time
-- Speed: ~50ms per character
-- Respects keyboard layout (US layout used)
-
-**Use Cases**:
-- Terminal commands
-- Passwords (insecure, use with caution)
-- Text input automation
-
-#### 2. `key` — Press Key Combination
-
-**Purpose**: Presses one or more keys simultaneously
-
-**Parameters**:
-- `combo` (string, required) — Key combination with `+` separator
-
-**Example**:
-```json
-{"action": "key", "combo": "ctrl+c"}
-```
-
-**Supported Modifiers**:
-- `ctrl` — Control key
-- `alt` — Alt key
-- `shift` — Shift key
-- `super` or `win` — Windows/Command key
-
-**Supported Keys**:
-- Letters: `a-z`
-- Numbers: `0-9`
-- Function keys: `f1-f12`
-- Special: `enter`, `escape`, `space`, `tab`, `backspace`, `delete`
-- Arrows: `up`, `down`, `left`, `right`
-
-**Combination Examples**:
-```json
-{"action": "key", "combo": "super+l"}          // Lock screen (Windows)
-{"action": "key", "combo": "ctrl+alt+delete"}  // Task manager
-{"action": "key", "combo": "alt+f4"}           // Close window
-{"action": "key", "combo": "ctrl+shift+esc"}   // Task manager direct
-```
-
-**Behavior**:
-- All keys pressed simultaneously
-- Released after ~50ms
-- Case-insensitive combo string
-
-#### 3. `wait` — Pause Execution
-
-**Purpose**: Delays next action by specified milliseconds
-
-**Parameters**:
-- `ms` (number, required) — Milliseconds to wait
-
-**Example**:
-```json
-{"action": "wait", "ms": 1000}
-```
-
-**Typical Values**:
-- `100-200` ms — Between rapid commands
-- `500-1000` ms — Wait for prompts to appear
-- `2000-5000` ms — Wait for services to start
-
-**Use Cases**:
-- Wait for terminal prompt
-- Wait for application to open
-- Delay before typing password
-- Service startup time
-
-#### 4. `enter` — Press Enter Key
-
-**Purpose**: Presses Enter key one or more times
-
-**Parameters**:
-- `count` (number, required) — Number of times to press (1-10)
-
-**Example**:
-```json
-{"action": "enter", "count": 3}
-```
-
-**Behavior**:
-- Presses Enter `count` times
-- 50ms delay between presses
-- Useful for clearing terminal or skipping prompts
-
-**Use Cases**:
-- Clear terminal scrollback: `count: 3`
-- Skip confirmation prompts: `count: 2`
-- Submit form: `count: 1`
-
-### Complete Scenario Examples
-
-**Docker Service Control**:
-```json
-"scenario_docker_restart": [
-  {"action": "enter", "count": 3},
-  {"action": "wait", "ms": 200},
-  {"action": "type", "value": "cd /opt/myapp && docker-compose restart"},
-  {"action": "key", "combo": "enter"}
-]
-```
-
-**Lock Screen**:
-```json
-"scenario_lock": [
-  {"action": "key", "combo": "super+l"}
-]
-```
-
-**Safe Shutdown**:
-```json
-"scenario_shutdown": [
-  {"action": "enter", "count": 3},
-  {"action": "wait", "ms": 1000},
-  {"action": "type", "value": "sudo shutdown -h now"},
-  {"action": "key", "combo": "enter"}
-]
-```
-
-**Complex Multi-Step**:
-```json
-"scenario_backup": [
-  {"action": "enter", "count": 3},
-  {"action": "type", "value": "cd /backups"},
-  {"action": "key", "combo": "enter"},
-  {"action": "wait", "ms": 500},
-  {"action": "type", "value": "bash backup.sh"},
-  {"action": "key", "combo": "enter"},
-  {"action": "wait", "ms": 2000},
-  {"action": "type", "value": "echo 'Backup complete'"},
-  {"action": "key", "combo": "enter"}
-]
-```
+*(The legacy `{"action": "wait", "ms": 500}` format is also supported).*
 
 ---
 
 ## State Persistence
 
-### state.json Structure
-
+### `state.json` Structure
 **Auto-generated file** (do not edit manually):
 
 ```json
 {
   "menu_cursor": 2,
+  "trigger_positions": {
+    "active_docker_service": 1,
+    "passive_hall_sensor_1": 0
+  },
   "seq_positions": {
-    "docker_service": 1,
-    "n8n_service": 0
+    "legacy_item": 1
   }
 }
 ```
 
-### Properties
-
-#### `menu_cursor` (number)
-
-Current menu item index (0-based)
-
-**Saved**: On every encoder rotation  
-**Restored**: On boot  
-**Scope**: Top-level menu only (not submenu positions)
-
-#### `seq_positions` (object)
-
-Tracks current position in each item's sequence
-
-**Key**: Item ID  
-**Value**: Current index in sequence array (0-based)
-
-**Saved**: After scenario execution  
-**Restored**: On boot  
-**Behavior**: Allows toggle pattern to remember state across reboots
-
-**Example**:
-```json
-"seq_positions": {
-  "docker_app": 1
-}
-```
-Means: Next click executes `sequence[1]` (e.g., "Start" if Stop was last)
-
-### File Writes
-
-**Normal Mode** (GP24 not held during boot):
-- File system writable from code
-- `state.json` auto-created and updated
-- USB drive read-only
-
-**Development Mode** (GP24 held during boot):
-- File system read-only from code
-- `state.json` changes not saved
-- USB drive writable for editing files
+- `menu_cursor`: Current menu index.
+- `trigger_positions`: Current execution index for pipelines with `loop: true`. Keys are prefixed with `active_` or `passive_`.
+- `seq_positions`: Legacy tracking for old `sequence` configurations.
 
 ---
 
 ## Validation Rules
 
-### Config Studio Validation
+The Config Studio (`editor.html`) validates the configuration to prevent runtime errors:
 
-The web editor validates:
-
-1. **JSON Syntax** — Valid JSON format
-2. **Required Sections** — All 5 sections present
-3. **Pin Ranges** — GPIO pins 0-29
-4. **Unique IDs** — No duplicate item IDs
-5. **Scenario References** — Scenarios exist in `scenarios` section
-6. **Sensor References** — Hall sensor IDs match bindings
-
-### Runtime Validation
-
-Code performs:
-
-1. **File Exists** — `config.json` present
-2. **JSON Parse** — Valid JSON structure
-3. **Graceful Degradation** — Missing optional fields use defaults
-
-### Common Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `No module named adafruit_*` | Missing libraries | Install libraries in `lib/` |
-| `Invalid JSON` | Syntax error | Use editor validator |
-| `Scenario not found` | Typo in scenario name | Verify name matches exactly |
-| `Pin * already in use` | Duplicate pin | Assign unique pins |
-| State not saving | Wrong boot mode | Boot without GP24 held |
+1. **JSON Syntax** — Ensures valid JSON format.
+2. **Missing Scenarios** — Warns if a pipeline references a scenario that doesn't exist in the `scenarios` section.
+3. **Missing Outputs** — Warns if a scenario step references an output that isn't defined in `outputs`.
+4. **Invalid Keys** — Warns if a HID `key` action uses unsupported keys.
+5. **Auto-Boot Limit** — Ensures only one output has auto-boot enabled.
+6. **Unique IDs** — Validates that menu item IDs are unique.
 
 ---
 
 ## Best Practices
 
-### Organization
-
 **Group Related Items**:
-```json
-"active_menu": [
-  {
-    "id": "services_folder",
-    "label": "Services",
-    "submenu": [
-      {"id": "docker", "label": "Docker", "sequence": [...]},
-      {"id": "nginx", "label": "Nginx", "sequence": [...]}
-    ]
-  }
-]
-```
+Use folders (`submenu`) to group related actions (e.g., all Docker containers in one folder).
 
 **Use Descriptive IDs**:
 - Good: `"nextcloud_restart"`, `"backup_daily"`
-- Bad: `"item1"`, `"test"`, `"x"`
+- Bad: `"item1"`, `"test"`
 
-### Naming Conventions
-
-**IDs**: `lowercase_with_underscores`  
-**Labels**: `Title Case` or `Sentence case`  
-**Scenarios**: `scenario_descriptive_name`
-
-### Scenario Design
-
-**Always Clear Terminal First**:
-```json
-{"action": "enter", "count": 3}
-```
-
-**Add Waits After Commands**:
-```json
-{"action": "key", "combo": "enter"},
-{"action": "wait", "ms": 500}
-```
-
-**Use Absolute Paths**:
-```json
-{"action": "type", "value": "cd /opt/app && docker-compose restart"}
-```
-Avoid relying on current directory.
-
-**Test Commands Manually First**:
-Before adding to scenario, verify command works in terminal.
-
-### Security
-
-**Avoid Plaintext Passwords**:
-```json
-// BAD:
-{"action": "type", "value": "password123"}
-
-// BETTER:
-// Use SSH keys, sudo NOPASSWD, or keyring integration
-```
-
-**Limit Emergency Trigger Scope**:
-Hall sensors bypass cooldown — bind only to safe scenarios:
-```json
-"passive": {
-  "hall_sensor_1": "scenario_safe_shutdown"  // OK
-  // NOT: "scenario_delete_all_data"  // Too dangerous
-}
-```
-
-### Performance
-
-**Limit Scenario Length**:
-- Max 10-15 steps per scenario
-- Long scenarios block input processing
-- Split complex workflows into multiple menu items
-
-**Optimize Wait Times**:
-- Don't wait longer than necessary
-- Test minimum required delays
-
-### Backup
-
-**Version Control**:
-```bash
-git add config.json
-git commit -m "Add Nextcloud service control"
-```
-
-**Keep Working Copies**:
-```bash
-cp config.json config.backup.json
-```
-
-**Document Changes**:
-Use git commit messages to track what changed and why.
+**Scenario Design**:
+- Clear the terminal before typing commands: `{"action": "enter", "count": 3}`
+- Add `{"wait": 200}` after pressing enter before typing the next command.
+- Use absolute paths in terminal commands (`cd /opt/app && docker-compose restart`).
 
 ---
 
 ## Examples
 
 ### Minimal Configuration
+A complete, valid, minimal configuration that prints "Hello World".
 
 ```json
 {
   "hardware": {
-    "hall_sensors": [],
     "button_pin": 24,
     "led_pin": 25,
     "encoder_clk": 6,
@@ -920,6 +481,14 @@ Use git commit messages to track what changed and why.
     "encoder_sw": 8,
     "display_sda": 4,
     "display_scl": 5
+  },
+  "inputs": {},
+  "outputs": {
+    "hid": {
+      "type": "hid",
+      "enabled": true,
+      "usb_layout": "us"
+    }
   },
   "device": {
     "armed": false,
@@ -933,28 +502,27 @@ Use git commit messages to track what changed and why.
     {
       "id": "hello",
       "label": "Hello World",
-      "sequence": [
-        {"scenario": "say_hello", "name": "Run"}
-      ]
+      "pipeline": [
+        {"scenario": "say_hello", "label": "Run"}
+      ],
+      "loop": false
     }
   ],
   "scenarios": {
     "say_hello": [
-      {"action": "type", "value": "echo Hello, World!"},
-      {"action": "key", "combo": "enter"}
+      {"output": "hid", "action": "type", "value": "echo Hello, World!"},
+      {"output": "hid", "action": "key", "combo": "enter"}
     ]
   }
 }
 ```
 
 ### Homelab Configuration
+A comprehensive configuration with sensors, GPIO control, auto-boot, and a toggle menu.
 
 ```json
 {
   "hardware": {
-    "hall_sensors": [
-      {"id": "hall_sensor_1", "pin": 15, "active_low": true}
-    ],
     "button_pin": 24,
     "led_pin": 25,
     "encoder_clk": 6,
@@ -962,6 +530,33 @@ Use git commit messages to track what changed and why.
     "encoder_sw": 8,
     "display_sda": 4,
     "display_scl": 5
+  },
+  "inputs": {
+    "case_door": {
+      "type": "hall",
+      "pin": 15,
+      "active_low": true
+    }
+  },
+  "outputs": {
+    "hid": {
+      "type": "hid",
+      "enabled": true,
+      "usb_layout": "us"
+    },
+    "pc_power": {
+      "type": "gpio",
+      "enabled": true,
+      "pin": 14,
+      "active_high": true,
+      "label": "PC Power Button",
+      "auto_boot": {
+        "enabled": true,
+        "check_interval_s": 15,
+        "max_attempts": 2,
+        "retry_cooldown_min": 5
+      }
+    }
   },
   "device": {
     "armed": true,
@@ -971,82 +566,49 @@ Use git commit messages to track what changed and why.
     "screensaver": "tesseract"
   },
   "passive": {
-    "hall_sensor_1": "scenario_emergency_shutdown",
-    "btn_double": "scenario_lock"
+    "case_door": {
+      "pipeline": ["scenario_safe_shutdown"],
+      "loop": false
+    }
   },
   "active_menu": [
     {
-      "id": "nextcloud",
-      "label": "Nextcloud",
-      "sequence": [
-        {"scenario": "nextcloud_stop", "name": "Stop"},
-        {"scenario": "nextcloud_start", "name": "Start"}
-      ]
+      "id": "turn_on_pc",
+      "label": "Boot PC",
+      "pipeline": [
+        {"scenario": "scenario_pulse_power", "label": "Power"}
+      ],
+      "loop": false
     },
     {
-      "id": "monitoring",
-      "label": "Monitoring",
-      "submenu": [
-        {
-          "id": "grafana",
-          "label": "Grafana",
-          "sequence": [
-            {"scenario": "grafana_stop", "name": "Stop"},
-            {"scenario": "grafana_start", "name": "Start"}
-          ]
-        },
-        {
-          "id": "prometheus",
-          "label": "Prometheus",
-          "sequence": [
-            {"scenario": "prometheus_stop", "name": "Stop"},
-            {"scenario": "prometheus_start", "name": "Start"}
-          ]
-        }
-      ]
+      "id": "docker_service",
+      "label": "Docker App",
+      "pipeline": [
+        {"scenario": "scenario_docker_stop", "label": "Stop"},
+        {"scenario": "scenario_docker_start", "label": "Start"}
+      ],
+      "loop": true
     }
   ],
   "scenarios": {
-    "nextcloud_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait", "ms": 200},
-      {"action": "type", "value": "cd /opt/nextcloud && docker-compose stop"},
-      {"action": "key", "combo": "enter"}
+    "scenario_safe_shutdown": [
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait": 500},
+      {"output": "hid", "action": "type", "value": "sudo shutdown -h now"},
+      {"output": "hid", "action": "key", "combo": "enter"}
     ],
-    "nextcloud_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait", "ms": 200},
-      {"action": "type", "value": "cd /opt/nextcloud && docker-compose start"},
-      {"action": "key", "combo": "enter"}
+    "scenario_pulse_power": [
+      {"output": "pc_power", "action": "gpio_pulse"}
     ],
-    "grafana_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "type", "value": "sudo systemctl stop grafana-server"},
-      {"action": "key", "combo": "enter"}
+    "scenario_docker_stop": [
+      {"output": "hid", "action": "enter", "count": 3},
+      {"output": "hid", "action": "type", "value": "docker-compose stop"},
+      {"output": "hid", "action": "key", "combo": "enter"}
     ],
-    "grafana_start": [
-      {"action": "enter", "count": 3},
-      {"action": "type", "value": "sudo systemctl start grafana-server"},
-      {"action": "key", "combo": "enter"}
-    ],
-    "prometheus_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "type", "value": "sudo systemctl stop prometheus"},
-      {"action": "key", "combo": "enter"}
-    ],
-    "prometheus_start": [
-      {"action": "enter", "count": 3},
-      {"action": "type", "value": "sudo systemctl start prometheus"},
-      {"action": "key", "combo": "enter"}
-    ],
-    "scenario_emergency_shutdown": [
-      {"action": "enter", "count": 3},
-      {"action": "wait", "ms": 1000},
-      {"action": "type", "value": "sudo shutdown -h now"},
-      {"action": "key", "combo": "enter"}
-    ],
-    "scenario_lock": [
-      {"action": "key", "combo": "super+l"}
+    "scenario_docker_start": [
+      {"output": "hid", "action": "enter", "count": 3},
+      {"output": "hid", "action": "type", "value": "docker-compose start"},
+      {"output": "hid", "action": "key", "combo": "enter"}
     ]
   }
 }
@@ -1054,56 +616,21 @@ Use git commit messages to track what changed and why.
 
 ---
 
-## Related Documentation
-
-- [Config Editor Guide](config-editor.md) — Visual configuration tool
-- [Quick Start](../../QUICK_START.md) — Getting started guide
-- [Architecture](../developers/architecture.md) — Technical details
-
----
-
 ## Troubleshooting
 
-### Config Not Loading
+### Hall Sensors Not Working
+1. Check that the ID in `inputs.<id>` matches the ID bound in the `passive` section.
+2. Verify `device.armed` is `true`.
+3. Check the serial console to ensure the hardware is actually triggering.
 
-**Symptom**: Device boots but shows errors
-
-**Check**:
-1. Verify `config.json` exists on CIRCUITPY root
-2. Validate JSON syntax (use Config Studio editor)
-3. Check serial console for error messages
-
-### Scenarios Don't Execute
-
-**Symptom**: Click encoder, nothing happens
-
-**Check**:
-1. Verify scenario name in sequence matches `scenarios` section (case-sensitive)
-2. Check USB connected (LED blinks on boot)
-3. Wait for cooldown to expire (5 seconds default)
-4. Check serial console: `[bus] DROP — cooldown` or busy message
+### Scenarios Not Executing
+1. Verify the scenario name in `active_menu[].pipeline[].scenario` exactly matches the key in the `scenarios` object.
+2. Check if a cooldown is active (`[bus] DROP — cooldown` in the console).
+3. If using HID actions, ensure the USB is connected to a host device.
 
 ### State Not Saving
-
-**Symptom**: Menu position resets on reboot
-
-**Check**:
-1. Boot in Normal Mode (don't hold GP24 button)
-2. Verify CIRCUITPY drive writable from code
-3. Check `state.json` exists and updates
-
-### Hall Sensors Not Working
-
-**Symptom**: Sensor triggers don't execute
-
-**Check**:
-1. `device.armed` is `true`
-2. Sensor ID in `passive` matches `hardware.hall_sensors[].id`
-3. Verify sensor wiring and `active_low` setting
-4. Check serial console for trigger messages
+If the menu cursor or toggle state resets on reboot, you might be booting in Development Mode. Do not hold the GP24 button while plugging in the device.
 
 ---
-
-**Last Updated**: 2024  
-**Config Version**: 1.0  
-**Compatible with**: Pico Commander 1.0+
+*Last Updated: 2026-06-24*  
+*Architecture: Unified Pipeline, Inputs, and Outputs Engine*

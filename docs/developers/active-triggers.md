@@ -12,7 +12,7 @@ The active trigger system handles user-initiated actions through the rotary enco
 
 - **Synchronous** — Triggered by explicit user action (encoder click)
 - **Menu-driven** — Integrated with hierarchical navigation system
-- **Stateful Sequences** — Toggle between multiple scenarios per menu item
+- **Unified Pipeline** — Shares the same execution engine (`execute_pipeline()`) as passive triggers
 - **Visual Feedback** — OLED displays current and next actions
 
 ---
@@ -60,7 +60,7 @@ The active trigger system handles user-initiated actions through the rotary enco
 │  Swipe       │          │                 │
 │              │          ▼                 ▼
 │  Save State  │   ┌────────────┐   ┌────────────┐
-└──────────────┘   │  Sequence  │   │  Submenu   │
+└──────────────┘   │  Pipeline  │   │  Submenu   │
                    │  Execute   │   │  Navigate  │
                    └─────┬──────┘   └────────────┘
                          │
@@ -72,8 +72,46 @@ The active trigger system handles user-initiated actions through the rotary enco
                          │
                          ▼
                 ┌──────────────────┐
-                │ Scenario Executor│
+                │ execute_pipeline()│
                 └──────────────────┘
+```
+
+---
+
+## Pipeline System
+
+Active triggers are defined by a `pipeline` of scenarios and a `loop` flag. This system replaced the legacy `"sequence"` format, although the engine still supports `"sequence"` for backward compatibility.
+
+### `loop: true` (Toggle Pattern)
+One click executes exactly **one** scenario from the pipeline. The system tracks the current position in `state.json`. The next click will execute the next scenario in the pipeline, wrapping around to the beginning.
+
+```json
+{
+  "id": "docker_service",
+  "label": "Docker App",
+  "pipeline": [
+    {"scenario": "docker_stop", "label": "Stop"},
+    {"scenario": "docker_start", "label": "Start"}
+  ],
+  "loop": true
+}
+```
+*Note: In the new pipeline format, the display name field is `"label"`. In the legacy sequence format, it was `"name"`.*
+
+### `loop: false` (Chain / One-Shot Pattern)
+One click executes the **entire** pipeline of scenarios sequentially at once. The system does not track position.
+
+```json
+{
+  "id": "backup_now",
+  "label": "Run Backup",
+  "pipeline": [
+    {"scenario": "backup_prepare", "label": "Prepare"},
+    {"scenario": "backup_execute", "label": "Execute"},
+    {"scenario": "backup_cleanup", "label": "Cleanup"}
+  ],
+  "loop": false
+}
 ```
 
 ---
@@ -83,18 +121,17 @@ The active trigger system handles user-initiated actions through the rotary enco
 ### Item Types
 
 **1. Action Items**
-- Contain `sequence` array
+- Contain `pipeline` and `loop`
 - Execute scenarios when clicked
-- Toggle through sequence on repeated clicks
+- Can toggle through the pipeline (`loop: true`) or execute all (`loop: false`)
 
 **2. Folder Items**
 - Contain `submenu` array
 - Navigate into folder on click
-- Can optionally have `sequence` (executes before opening)
 
 **3. Hybrid Items**
-- Both `sequence` AND `submenu`
-- Execute scenario, then open folder
+- Both `pipeline` AND `submenu`
+- `code.py` checks both independently: it will execute the pipeline scenarios first, then navigate into the folder.
 
 ### Menu Configuration
 
@@ -103,10 +140,8 @@ The active trigger system handles user-initiated actions through the rotary enco
   {
     "id": "docker_service",
     "label": "Docker App",
-    "sequence": [
-      {"scenario": "docker_stop", "name": "Stop"},
-      {"scenario": "docker_start", "name": "Start"}
-    ]
+    "pipeline": [ ... ],
+    "loop": true
   },
   {
     "id": "servers_folder",
@@ -115,7 +150,8 @@ The active trigger system handles user-initiated actions through the rotary enco
       {
         "id": "web_server",
         "label": "Web Server",
-        "sequence": [...]
+        "pipeline": [ ... ],
+        "loop": false
       }
     ]
   }
@@ -131,7 +167,7 @@ The active trigger system handles user-initiated actions through the rotary enco
 ```
 Root Menu
 ├── Item 1 (Action)
-│   └── sequence: [scenario_a, scenario_b]
+│   └── pipeline: [scenario_a, scenario_b]
 ├── Item 2 (Folder)
 │   └── submenu:
 │       ├── Item 2.1 (Action)
@@ -156,21 +192,6 @@ menu_cursor = 0
 
 # Navigate back (long press)
 current_menu_list, menu_cursor = menu_stack.pop()
-```
-
-**Stack Example**:
-```
-User at Root → clicks Folder A → clicks Folder B
-Stack: [(Root, 1), (Folder A, 0)]
-Current: Folder B, cursor 0
-
-User long-presses → back to Folder A
-Stack: [(Root, 1)]
-Current: Folder A, cursor 0
-
-User long-presses → back to Root
-Stack: []
-Current: Root, cursor 1
 ```
 
 ---
@@ -200,16 +221,11 @@ def on_encoder_event(event):
         display.animate_swipe(old_label, new_label, "right")
         save_cursor()
     
-    elif event == EV_ROTATE_LEFT:
-        menu_cursor = (menu_cursor - 1) % len(current_menu_list)
-        display.animate_swipe(old_label, new_label, "left")
-        save_cursor()
-    
     elif event == EV_PRESS:
         item = current_menu_list[menu_cursor]
         
-        # Execute sequence if exists
-        if "sequence" in item:
+        # Execute pipeline/sequence if exists
+        if "pipeline" in item or "sequence" in item:
             display.show_executing(item["label"], action_name)
             trigger_bus.fire_active(item["id"])
         
@@ -220,88 +236,7 @@ def on_encoder_event(event):
             menu_cursor = 0
         
         refresh_menu()
-    
-    elif event == EV_LONG_PRESS:
-        if menu_stack:
-            current_menu_list, menu_cursor = menu_stack.pop()
-            refresh_menu()
 ```
-
----
-
-## Sequence System
-
-### Sequence Behavior
-
-Sequences allow **toggling** between multiple scenarios with repeated clicks:
-
-```json
-"sequence": [
-  {"scenario": "service_stop", "name": "Stop"},
-  {"scenario": "service_start", "name": "Start"},
-  {"scenario": "service_restart", "name": "Restart"}
-]
-```
-
-**User Experience**:
-```
-Click 1: Execute "service_stop"    → Display shows "Start" (next)
-Click 2: Execute "service_start"   → Display shows "Restart" (next)
-Click 3: Execute "service_restart" → Display shows "Stop" (loops back)
-Click 4: Execute "service_stop"    → ...
-```
-
-### Sequence State Persistence
-
-```json
-// state.json
-{
-  "menu_cursor": 2,
-  "seq_positions": {
-    "docker_service": 1,    // Currently at index 1 (Start)
-    "n8n_service": 0        // Currently at index 0 (Stop)
-  }
-}
-```
-
-**State Management**:
-```python
-# Load current position
-positions = state.get("seq_positions", {})
-pos = positions.get(item_id, 0) % len(sequence)
-
-# Get scenario at current position
-scenario_entry = sequence[pos]
-scenario_name = scenario_entry["scenario"]
-
-# Execute scenario
-trigger_bus.fire_active(item_id)
-
-# Advance position
-positions[item_id] = (pos + 1) % len(sequence)
-config.save_state()
-```
-
-### Sequence Entry Format
-
-**Simple Format** (string):
-```json
-"sequence": ["scenario_name"]
-```
-- Scenario name only
-- Display name = scenario name
-
-**Detailed Format** (object):
-```json
-"sequence": [
-  {
-    "scenario": "scenario_name",
-    "name": "Display Name"
-  }
-]
-```
-- Custom display name
-- More descriptive for UI
 
 ---
 
@@ -309,75 +244,84 @@ config.save_state()
 
 ### Fire Active Flow
 
+When `trigger_bus.fire_active(item_id)` is called, it acts as a facade that normalizes the menu item configuration and passes it to the unified pipeline engine.
+
 ```python
 def fire_active(item_id):
-    # 1. Check anti-conflict rules
-    if not _can_fire(PRIORITY_NORMAL):
-        return False
-    
-    # 2. Find menu item by ID (recursive search)
     item = _find_item(config["active_menu"], item_id)
-    if not item:
-        return False
     
-    # 3. Get sequence
+    # Path 1: New Pipeline Format
+    if "pipeline" in item:
+        # execute_pipeline handles busy flags, cooldowns, and loop branching
+        return execute_pipeline(item, f"active_{item_id}", PRIORITY_NORMAL)
+    
+    # Path 2: Legacy Sequence Format (Fallback)
     sequence = item.get("sequence", [])
-    if not sequence:
-        return False
     
-    # 4. Load current sequence position
-    positions = state.get("seq_positions", {})
-    pos = positions.get(item_id, 0) % len(sequence)
+    # Convert sequence to pipeline format
+    pipeline = [_resolve_seq_entry(entry)[0] for entry in sequence]
+    pipeline_config = {
+        "pipeline": pipeline,
+        "loop": True  # sequence was always a toggle loop
+    }
     
-    # 5. Resolve scenario name
-    entry = sequence[pos]
-    scenario_name = entry["scenario"] if isinstance(entry, dict) else entry
-    
-    # 6. Set busy flag
-    _busy = True
-    
-    try:
-        # 7. Execute scenario
-        _run_scenario(scenario_name)
-        
-        # 8. Advance sequence position
-        positions[item_id] = (pos + 1) % len(sequence)
-        config.save_state()
-    
-    finally:
-        # 9. Clear busy flag
-        _busy = False
-        
-        # 10. Apply cooldown
-        _apply_cooldown()
-    
-    return True
+    return execute_pipeline(pipeline_config, f"active_{item_id}", PRIORITY_NORMAL)
 ```
 
 ### Recursive Item Search
 
-Menu items can be nested arbitrarily deep. Trigger bus searches recursively:
+Menu items can be nested arbitrarily deep. The trigger bus searches recursively to find the item by its globally unique `id`.
 
-```python
-def _find_item(menu, item_id):
-    for item in menu:
-        # Match found
-        if item["id"] == item_id:
-            return item
-        
-        # Search submenu
-        if "submenu" in item:
-            found = _find_item(item["submenu"], item_id)
-            if found:
-                return found
-    
-    return None
+---
+
+## State Persistence
+
+### What Gets Saved (`state.json`)
+
+**Menu Cursor Position**:
+```json
+{
+  "menu_cursor": 3  // Currently at 4th item (0-indexed)
+}
 ```
+- Saved on every rotation.
+- Restored on boot.
+- Per-level (not saved when traversing into a submenu).
 
-**Why Needed**: 
-- Item IDs must be globally unique
-- User might click item deep in hierarchy
-- Sequence state persists across navigation
+**Trigger Positions (New Mechanism)**:
+```json
+{
+  "trigger_positions": {
+    "active_docker_service": 1,
+    "passive_hall_sensor_1": 0
+  }
+}
+```
+- Tracks positions for `loop: true` pipelines.
+- Prefixed with `active_` or `passive_` based on the trigger source.
+
+**Sequence Positions (Legacy Mechanism)**:
+```json
+{
+  "seq_positions": {
+    "legacy_item_id": 2
+  }
+}
+```
+- Used **only** for menu items still using the legacy `"sequence"` format.
+- Keys are the bare `item_id`.
+
+### File Write Behavior
+
+**Normal Boot Mode**:
+- File system writable from code
+- `state.json` auto-created/updated
+- USB drive read-only from host
+
+**Development Boot Mode** (GP24 held during boot):
+- File system read-only from code
+- `state.json` changes not saved
+- USB drive writable from host for editing
 
 ---
 
@@ -393,86 +337,13 @@ def _find_item(menu, item_id):
 └────────────────────────────────┘
 ```
 
-### Execution Display
+### Dynamic Next Action Hint
 
-```
-┌────────────────────────────────┐
-│ Running...                     │  Feedback
-│ Docker Service                 │  Item being executed
-│ Start                          │  Action being executed
-└────────────────────────────────┘
-```
+The `get_next_action_name(item_id)` function determines what shows up on the third line (`-> Start`):
 
-### Swipe Animation
-
-**6-Frame Horizontal Slide**:
-```
-Frame 0: [Old Label]              [New Label off-screen]
-Frame 1: [Old    ]  Label]        [New Label        ]
-Frame 2:     [Old Label]          [  New Label      ]
-Frame 3:        [Old Label]       [    New Label    ]
-Frame 4:           [Old Label]    [      New Label  ]
-Frame 5:              [Old Label] [        New Label]
-Frame 6:                          [New Label]
-```
-
-**Duration**: ~132ms (6 frames × 22ms)
-
----
-
-## State Persistence
-
-### What Gets Saved
-
-**Menu Cursor Position**:
-```json
-{
-  "menu_cursor": 3  // Currently at 4th item (0-indexed)
-}
-```
-- Saved on every rotation
-- Restored on boot
-- Per-level (not saved when in submenu)
-
-**Sequence Positions**:
-```json
-{
-  "seq_positions": {
-    "item_id_1": 2,
-    "item_id_2": 0
-  }
-}
-```
-- Saved after every sequence execution
-- Restored on boot
-- Persists across power cycles
-
-### Save Timing
-
-```python
-# Cursor save: immediate on rotation
-def on_encoder_event(EV_ROTATE_*):
-    menu_cursor = ...
-    save_cursor()  # Writes state.json
-
-# Sequence save: after scenario completes
-def fire_active(item_id):
-    execute_scenario()
-    positions[item_id] = new_pos
-    config.save_state()  # Writes state.json
-```
-
-### File Write Behavior
-
-**Normal Boot Mode**:
-- File system writable from code
-- state.json auto-created/updated
-- USB drive read-only
-
-**Development Boot Mode** (GP24 held):
-- File system read-only from code
-- state.json changes not saved
-- USB drive writable for editing
+- **Pipeline + `loop: true`**: Shows the `label` of the scenario at the current `trigger_positions` index. (Changes after every click).
+- **Pipeline + `loop: false`**: **Always** shows the `label` of the first scenario (`pipeline[0]`). Since all scenarios execute at once, there is no "next" state to track.
+- **Legacy Sequence**: Shows the `name` of the scenario at the current `seq_positions` index.
 
 ---
 
@@ -480,7 +351,7 @@ def fire_active(item_id):
 
 ### Cooldown Enforcement
 
-Active triggers respect cooldown (unlike passive HIGH priority):
+Active triggers respect cooldowns (unlike passive HIGH priority triggers):
 
 ```python
 if now < _cooldown_until:
@@ -488,9 +359,8 @@ if now < _cooldown_until:
     return False
 ```
 
-**Purpose**: Prevent rapid repeated execution from encoder bounce or accidental double-clicks
-
-**Duration**: 5000ms default (configurable via `device.cooldown_ms`)
+**Purpose**: Prevent rapid repeated execution from encoder bounce or accidental double-clicks.
+**Duration**: 5000ms default (configurable via `device.cooldown_ms`).
 
 ### Busy Flag
 
@@ -500,18 +370,13 @@ if _busy:
     return False
 ```
 
-**Purpose**: Prevent overlapping scenario execution
-
-**Behavior**:
-- Set at start of `fire_active()`
-- Cleared in `finally` block (guaranteed)
-- Rejects all triggers (active and passive) during execution
+**Purpose**: Prevent overlapping scenario execution.
 
 ---
 
 ## Interaction Patterns
 
-### Toggle Pattern
+### Toggle Pattern (`loop: true`)
 
 **Use Case**: Start/Stop services
 
@@ -519,37 +384,33 @@ if _busy:
 {
   "id": "service_toggle",
   "label": "My Service",
-  "sequence": [
-    {"scenario": "service_stop", "name": "Stop"},
-    {"scenario": "service_start", "name": "Start"}
-  ]
+  "pipeline": [
+    {"scenario": "service_stop", "label": "Stop"},
+    {"scenario": "service_start", "label": "Start"}
+  ],
+  "loop": true
 }
 ```
 
-**User Flow**:
-1. Navigate to "My Service"
-2. Click → Executes stop → Display shows "Start"
-3. Click → Executes start → Display shows "Stop"
-4. Click → Executes stop → ...
+### Chain Pattern (`loop: false`)
 
-### Multi-Action Pattern
-
-**Use Case**: Service lifecycle management
+**Use Case**: Execute multiple discrete scenarios in order on a single click.
 
 ```json
 {
-  "id": "service_mgmt",
-  "label": "Web Server",
-  "sequence": [
-    {"scenario": "web_stop", "name": "Stop"},
-    {"scenario": "web_start", "name": "Start"},
-    {"scenario": "web_restart", "name": "Restart"},
-    {"scenario": "web_status", "name": "Status"}
-  ]
+  "id": "complex_macro",
+  "label": "Deploy App",
+  "pipeline": [
+    {"scenario": "pull_repo", "label": "Pulling..."},
+    {"scenario": "build_image", "label": "Building..."},
+    {"scenario": "start_container", "label": "Starting..."}
+  ],
+  "loop": false
 }
 ```
+*⚠️ **Note**: Currently, this specific case (multiple scenarios with `loop: false`) can only be authored by hand-editing `config.json`. The Config Studio UI limits non-loop pipelines to a single scenario via the UI constraints.*
 
-### One-Shot Pattern
+### One-Shot Pattern (`loop: false`)
 
 **Use Case**: Single-action commands
 
@@ -557,13 +418,12 @@ if _busy:
 {
   "id": "backup_now",
   "label": "Run Backup",
-  "sequence": [
-    {"scenario": "backup_full", "name": "Execute"}
-  ]
+  "pipeline": [
+    {"scenario": "backup_full", "label": "Execute"}
+  ],
+  "loop": false
 }
 ```
-
-**Behavior**: Always executes same scenario, cycles back to self
 
 ---
 
@@ -575,35 +435,18 @@ if _busy:
 {
   "id": "servers_with_action",
   "label": "Servers",
-  "sequence": [
-    {"scenario": "refresh_status", "name": "Refresh"}
+  "pipeline": [
+    {"scenario": "refresh_status", "label": "Refresh"}
   ],
+  "loop": false,
   "submenu": [...]
 }
 ```
 
 **Behavior**:
-1. Click → Execute "refresh_status"
-2. After execution → Open submenu automatically
-3. User sees updated status in subfolder
-
-### Dynamic Next Action
-
-Display shows next action without executing:
-
-```python
-def get_next_action_name(item_id):
-    # Non-destructive: doesn't advance sequence
-    positions = state.get("seq_positions", {})
-    pos = positions.get(item_id, 0)
-    entry = sequence[pos]
-    return entry["name"]
-```
-
-**Used For**:
-- Display footer line
-- User preview of next click
-- No side effects
+1. Click → Execute "refresh_status" scenario.
+2. After execution → Open submenu automatically.
+3. User sees updated status in subfolder.
 
 ---
 
@@ -615,22 +458,9 @@ def get_next_action_name(item_id):
 
 **Check**:
 1. Serial console: `[bus] DROP — busy` or cooldown message
-2. Verify item has `sequence` in config.json
+2. Verify item has `pipeline` in config.json
 3. Check scenario exists in `scenarios` object
-4. Verify USB connected
-
-### Wrong Scenario Executes
-
-**Symptoms**: Click executes unexpected scenario
-
-**Causes**:
-- Sequence position saved incorrectly
-- Duplicate item IDs in menu
-
-**Solutions**:
-1. Delete state.json and reboot (resets positions)
-2. Verify all item IDs are unique
-3. Check `seq_positions` in state.json
+4. Verify USB connected (if using HID output)
 
 ### Menu Cursor Resets
 
@@ -639,8 +469,6 @@ def get_next_action_name(item_id):
 **Causes**:
 - Booted in Development Mode (GP24 held)
 - state.json not writable
-
-**Solution**: Boot in Normal Mode (don't hold GP24)
 
 ### Sequence Loops Too Fast
 
@@ -668,15 +496,19 @@ def get_next_action_name(item_id):
 | Click to execution | ~20ms | Callback + trigger bus |
 | Total user latency | ~150ms | Perceived delay |
 
-### Memory Usage
-
-- **Menu tree**: ~100-500 bytes per item (depends on label length)
-- **Navigation stack**: ~20 bytes per level
-- **State persistence**: ~50-200 bytes (depends on item count)
-
 ---
 
 ## API Reference
+
+### Trigger Bus Active Trigger API
+
+**Functions**:
+```python
+trigger_bus.fire_active(item_id)              # Façade for menu item triggers
+trigger_bus.execute_pipeline(config, id, pri) # Core unified pipeline engine
+trigger_bus.fire_scenario(name)               # Direct execution (used for auto-boot)
+trigger_bus.get_next_action_name(item_id)     # Preview next action (non-destructive)
+```
 
 ### EncoderHandler Class
 
@@ -691,26 +523,12 @@ set_callback(cb)   # Register event handler
 update()           # Poll encoder, call every loop
 ```
 
-**Events**:
-```python
-EV_ROTATE_LEFT
-EV_ROTATE_RIGHT
-EV_PRESS
-EV_LONG_PRESS
-```
-
-### Trigger Bus Active Trigger API
-
-**Functions**:
-```python
-trigger_bus.fire_active(item_id)              # Execute menu item sequence
-trigger_bus.get_next_action_name(item_id)     # Preview next action (non-destructive)
-```
-
 ---
 
 ## Related Documentation
 
 - [Passive Trigger System](passive-triggers.md)
 - [Trigger Bus Architecture](architecture.md#trigger-system)
+- [Pipeline Configuration Guide](../user/pipelines.md)
+- [Outputs System Guide](outputs.md)
 - [Menu Configuration Guide](../user/config-editor.md#tab-1-menu-hierarchy)

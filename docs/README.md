@@ -18,6 +18,7 @@ Complete documentation for configuring, using, and extending Pico Commander.
 - [Main Project README](../README.md)
 - [Hardware Scheme](../README.md#-hardware-scheme)
 - [Installation Guide](../README.md#-installation)
+- [Changelog](../CHANGELOG.md)
 - [License](../LICENSE)
 
 ## Documentation Structure

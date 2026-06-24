@@ -117,7 +117,7 @@ Please describe:
 ### Configuration Issues
 
 **Problem:** Scenarios don't execute
-- **Solution:** Check USB connection is active, verify scenario name in menu `sequence`
+- **Solution:** Check USB connection is active, verify scenario name in menu `pipeline` (legacy `sequence` is also supported)
 - **Debug:** Open text editor on computer, test if keystrokes appear
 
 **Problem:** Menu navigation broken
@@ -125,7 +125,7 @@ Please describe:
 - **Check:** Ensure `active_menu` array structure is correct
 
 **Problem:** Hall sensors not triggering
-- **Solution:** Check `device.armed` is `true`, verify sensor polarity (active-low/high)
+- **Solution:** Check `device.armed` is `true`, verify `inputs.<id>.active_low` configuration
 - **Test:** Watch serial console for trigger events
 
 ### Hardware Issues

@@ -1,9 +1,40 @@
 {
+  "inputs": {
+    "hall_sensor_1": {
+      "type": "hall",
+      "pin": 15,
+      "active_low": true
+    },
+    "hall_sensor_2": {
+      "type": "hall",
+      "pin": 16,
+      "active_low": true
+    },
+    "ina226": {
+      "type": "power_monitor",
+      "enabled": true,
+      "trigger_mode": "percent",
+      "threshold_percent": 15,
+      "threshold_voltage": 16.5,
+      "warning_offset_percent": 5,
+      "cooldown_sec": 300,
+      "cancel_cooldown_sec": 3600,
+      "read_interval_sec": 5.0,
+      "warning_enabled": true,
+      "warning_blink_interval": 0.5,
+      "warning_canceled_display_sec": 2.0,
+      "splash_interval_sec": 30,
+      "splash_duration_sec": 6,
+      "battery_max_v": 21.0,
+      "battery_min_v": 15.0,
+      "shunt_ohms": 0.1,
+      "i2c_scl": 5,
+      "i2c_sda": 4,
+      "i2c_address": 64
+    }
+  },
+
   "hardware": {
-    "hall_sensors": [
-      {"id": "hall_sensor_1", "pin": 15, "active_low": true},
-      {"id": "hall_sensor_2", "pin": 16, "active_low": true}
-    ],
     "button_pin": 24,
     "led_pin":    25,
     "encoder_clk": 6,
@@ -21,10 +52,45 @@
     "screensaver": "tesseract"
   },
 
+  "outputs": {
+    "hid": {
+      "type": "hid",
+      "enabled": true,
+      "usb_layout": "us"
+    },
+    "opto_pwr": {
+      "type": "gpio",
+      "enabled": true,
+      "pin": 14,
+      "active_high": true,
+      "label": "Nettop Power Button",
+      "default_scenario": "scenario_opto_pwr_pulse",
+      "auto_boot": {
+        "enabled": true,
+        "check_interval_s": 15,
+        "max_attempts": 2,
+        "retry_cooldown_min": 5
+      }
+    }
+  },
+
   "passive": {
-    "hall_sensor_1": "scenario_shutdown",
-    "hall_sensor_2": "scenario_shutdown",
-    "btn_double":    "scenario_lock"
+    "hall_sensor_1": {
+      "pipeline": ["scenario_shutdown"],
+      "loop": false
+    },
+    "hall_sensor_2": {
+      "pipeline": ["scenario_shutdown"],
+      "loop": false
+    },
+    "ina226": {
+      "pipeline": ["scenario_shutdown"],
+      "loop": false
+    },
+    "btn_double": {
+      "pipeline": ["scenario_lock"],
+      "loop": false
+    }
   },
 
   "active_menu": [
@@ -39,9 +105,8 @@
             {
               "id": "test_item_3",
               "label": "Item 3",
-              "sequence": [
-                {"scenario": "scenario_test_nested", "name": "Run Test"}
-              ]
+              "pipeline": ["scenario_test_nested"],
+              "loop": false
             }
           ]
         }
@@ -50,158 +115,205 @@
     {
       "id":    "nextcloud",
       "label": "Nextcloud",
-      "sequence": [
-        {"scenario": "scenario_nextcloud_stop",  "name": "Stop"},
-        {"scenario": "scenario_nextcloud_start", "name": "Start"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_nextcloud_stop", "label": "Stop"},
+        {"scenario": "scenario_nextcloud_start", "label": "Start"}
+      ],
+      "loop": true
     },
     {
       "id":    "searxng",
       "label": "SearXNG",
-      "sequence": [
-        {"scenario": "scenario_searxng_stop",  "name": "Stop"},
-        {"scenario": "scenario_searxng_start", "name": "Start"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_searxng_stop", "label": "Stop"},
+        {"scenario": "scenario_searxng_start", "label": "Start"}
+      ],
+      "loop": true
     },
     {
       "id":    "n8n",
       "label": "n8n Stack",
-      "sequence": [
-        {"scenario": "scenario_n8n_stop",  "name": "Stop"},
-        {"scenario": "scenario_n8n_start", "name": "Start"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_n8n_stop", "label": "Stop"},
+        {"scenario": "scenario_n8n_start", "label": "Start"}
+      ],
+      "loop": true
     },
     {
       "id":    "cups",
       "label": "CUPS Print",
-      "sequence": [
-        {"scenario": "scenario_cups_stop",  "name": "Stop"},
-        {"scenario": "scenario_cups_start", "name": "Start"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_cups_stop", "label": "Stop"},
+        {"scenario": "scenario_cups_start", "label": "Start"}
+      ],
+      "loop": true
     },
     {
       "id":    "dokuwiki",
       "label": "DokuWiki",
-      "sequence": [
-        {"scenario": "scenario_dokuwiki_stop",  "name": "Stop"},
-        {"scenario": "scenario_dokuwiki_start", "name": "Start"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_dokuwiki_stop", "label": "Stop"},
+        {"scenario": "scenario_dokuwiki_start", "label": "Start"}
+      ],
+      "loop": true
     },
     {
       "id":    "monitoring",
       "label": "Monitoring",
-      "sequence": [
-        {"scenario": "scenario_monitoring_stop",  "name": "Stop All"},
-        {"scenario": "scenario_monitoring_start", "name": "Start All"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_monitoring_stop", "label": "Stop"},
+        {"scenario": "scenario_monitoring_start", "label": "Start"}
+      ],
+      "loop": true
     },
     {
       "id":    "tududi",
       "label": "Tududi",
-      "sequence": [
-        {"scenario": "scenario_tududi_stop",  "name": "Stop"},
-        {"scenario": "scenario_tududi_start", "name": "Start"}
-      ]
+      "pipeline": [
+        {"scenario": "scenario_tududi_stop", "label": "Stop"},
+        {"scenario": "scenario_tududi_start", "label": "Start"}
+      ],
+      "loop": true
+    },
+    {
+      "id": "test_gpio",
+      "label": "TEST GPIO",
+      "pipeline": ["scenario_test_opto_pulse"],
+      "loop": false
     }
   ],
 
   "scenarios": {
+    "scenario_opto_pwr_pulse": [
+      {"output": "opto_pwr", "action": "gpio_pulse"}
+    ],
+
     "scenario_test_nested": [
-      {"action": "type", "value": "Nested submenu works!"},
-      {"action": "key", "combo": "enter"}
+      {"output": "hid", "action": "type", "value": "Nested submenu works!"},
+      {"output": "hid", "action": "key", "combo": "enter"}
     ],
+
+    "scenario_test_opto_pulse": [
+      {"output": "hid", "action": "type", "value": "Pressing nettop button..."},
+      {"output": "hid", "action": "key", "combo": "enter"},
+      {"wait": 500},
+      {"output": "opto_pwr", "action": "gpio_pulse"},
+      {"wait": 500},
+      {"output": "hid", "action": "type", "value": "Button released!"},
+      {"output": "hid", "action": "key", "combo": "enter"}
+    ],
+
+    "scenario_boot_server": [
+      {"output": "opto_pwr", "action": "gpio_pulse"}
+    ],
+
     "scenario_shutdown": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 1000},
-      {"action": "type",  "value": "safe_shutdown --now"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  1000},
+      {"output": "hid", "action": "type",  "value": "safe_shutdown --now"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_lock": [
-      {"action": "key", "combo": "super+l"}
+      {"output": "hid", "action": "key", "combo": "super+l"}
     ],
+
     "scenario_nextcloud_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "sudo systemctl stop cloudflared-nextcloud; cd /opt/nextcloud && docker-compose stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "sudo systemctl stop cloudflared-nextcloud; cd /opt/nextcloud && docker-compose stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_nextcloud_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/nextcloud && docker-compose start; sudo systemctl start cloudflared-nextcloud"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/nextcloud && docker-compose start; sudo systemctl start cloudflared-nextcloud"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_searxng_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "sudo systemctl stop cloudflared-searxng; cd /opt/searxng && docker-compose stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "sudo systemctl stop cloudflared-searxng; cd /opt/searxng && docker-compose stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_searxng_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/searxng && docker-compose start; sudo systemctl start cloudflared-searxng"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/searxng && docker-compose start; sudo systemctl start cloudflared-searxng"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_n8n_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "sudo systemctl stop cloudflared-n8n; cd /opt/n8n && docker-compose stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "sudo systemctl stop cloudflared-n8n; cd /opt/n8n && docker-compose stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_n8n_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/n8n && docker-compose start; sudo systemctl start cloudflared-n8n"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/n8n && docker-compose start; sudo systemctl start cloudflared-n8n"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_cups_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_cups_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml start"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml start"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_dokuwiki_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/dokuwiki && docker-compose stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/dokuwiki && docker-compose stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_dokuwiki_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/dokuwiki && docker-compose start"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/dokuwiki && docker-compose start"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_monitoring_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/monitoring && docker-compose stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/monitoring && docker-compose stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_monitoring_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/monitoring && docker-compose start"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/monitoring && docker-compose start"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_tududi_stop": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/tududi && docker-compose stop"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/tududi && docker-compose stop"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ],
+
     "scenario_tududi_start": [
-      {"action": "enter", "count": 3},
-      {"action": "wait",  "ms": 200},
-      {"action": "type",  "value": "cd /opt/tududi && docker-compose start"},
-      {"action": "key",   "combo": "enter"}
+      {"output": "hid", "action": "enter", "count": 3},
+      {"wait":  200},
+      {"output": "hid", "action": "type",  "value": "cd /opt/tududi && docker-compose start"},
+      {"output": "hid", "action": "key",   "combo": "enter"}
     ]
   }
 }

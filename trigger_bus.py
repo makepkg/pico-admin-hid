@@ -1,5 +1,5 @@
 """
-trigger_bus.py — центральная шина триггеров.
+trigger_bus.py — центральная шина триггеров с поддержкой множественных outputs.
 
 Единственная точка исполнения сценариев для всей системы.
 Предотвращает конфликты через busy-флаг и cooldown.
@@ -11,33 +11,98 @@ trigger_bus.py — центральная шина триггеров.
 """
 
 import time
-import supervisor
-import usb_hid
-from adafruit_hid.keyboard import Keyboard
-from adafruit_hid.keyboard_layout_us import KeyboardLayoutUS
-from adafruit_hid.keycode import Keycode
 import config as cfg
+
+# Импорты новых output handlers
+from output_hid import HidOutput
+from output_gpio import GpioOutput
 
 PRIORITY_LOW    = 0
 PRIORITY_NORMAL = 1
 PRIORITY_HIGH   = 2
 
-_kbd     = None
-_layout  = None
-_key_map = None
-
+_outputs_manager = None
 _busy           = False
 _cooldown_until = 0.0
+
+
+# ── OutputsManager ─────────────────────────────────────────────────────────
+
+class OutputsManager:
+    """Управляет всеми output handlers (HID, GPIO, и т.д.)"""
+    
+    def __init__(self, config):
+        self._outputs = {}
+        outputs_config = config.get("outputs", {})
+        
+        for name, cfg_dict in outputs_config.items():
+            output_type = cfg_dict.get("type")
+            try:
+                if output_type == "hid":
+                    self._outputs[name] = HidOutput(name, cfg_dict)
+                elif output_type == "gpio":
+                    self._outputs[name] = GpioOutput(name, cfg_dict)
+                else:
+                    print(f"[outputs] Unknown type '{output_type}' for output '{name}'")
+            except Exception as e:
+                print(f"[outputs] Failed to init output '{name}':", e)
+        
+        print(f"[outputs] Manager ready: {len(self._outputs)} outputs loaded")
+    
+    def execute(self, output_name, action):
+        """Выполнить действие через указанный output.
+        
+        Args:
+            output_name: имя output из config (напр. "hid", "opto_pwr")
+            action: dict шага сценария
+        
+        Returns:
+            bool: успех выполнения
+        """
+        handler = self._outputs.get(output_name)
+        if handler is None:
+            print(f"[outputs] Output '{output_name}' not found")
+            return False
+        
+        if not handler.enabled:
+            print(f"[outputs] Output '{output_name}' is disabled")
+            return False
+        
+        return handler.execute(action)
+    
+    def get(self, output_name):
+        """Получить handler по имени (для прямого доступа)"""
+        return self._outputs.get(output_name)
 
 
 # ── Init ───────────────────────────────────────────────────────────────────
 
 def init():
-    global _kbd, _layout, _key_map
-    _kbd     = Keyboard(usb_hid.devices)
-    _layout  = KeyboardLayoutUS(_kbd)
-    _key_map = _build_key_map()
-    print("[bus] keyboard OK")
+    """Инициализация outputs manager — вызывать ДО любых fire()"""
+    global _outputs_manager
+    conf = cfg.get_config()
+    _outputs_manager = OutputsManager(conf)
+    print("[bus] Outputs manager OK")
+
+
+def execute_output(output_name, action):
+    """Выполнить действие через указанный output (публичный API).
+    
+    Args:
+        output_name: имя output из config (напр. "hid", "opto_pwr")
+        action: dict действия (напр. {"action": "gpio_pulse"})
+    
+    Returns:
+        bool: True при успехе, False при ошибке
+    
+    Example:
+        success = trigger_bus.execute_output("opto_pwr", {"action": "gpio_pulse"})
+    """
+    if _outputs_manager is None:
+        print("[bus] ERROR: execute_output called before init()")
+        return False
+    
+    return _outputs_manager.execute(output_name, action)
 
 
 # ── Internal: рекурсивный поиск элемента по id ────────────────────────────
@@ -61,14 +126,89 @@ def _find_item(menu, item_id):
 
 # ── Public API ─────────────────────────────────────────────────────────────
 
-def fire(trigger_name, priority=PRIORITY_NORMAL):
+# ── Public API ─────────────────────────────────────────────────────────────
+
+def execute_pipeline(pipeline_config, trigger_id, priority=PRIORITY_NORMAL):
+    """
+    Универсальная функция выполнения пайплайна триггера.
+    
+    Args:
+        pipeline_config: dict с ключами:
+            - "pipeline": list[str|dict] - список сценариев (строки или {"scenario": "...", "label": "..."})
+            - "loop": bool - режим выполнения (false=все подряд, true=циклический)
+        trigger_id: str - ID триггера для отслеживания позиции (при loop=true)
+        priority: int - приоритет выполнения
+    
+    Returns:
+        bool: успех выполнения
+    
+    Modes:
+        loop=false: выполняет все сценарии из pipeline подряд (halt on error)
+        loop=true:  выполняет один сценарий по текущей позиции, инкрементирует позицию
+    """
     global _busy
     if not _can_fire(priority):
         return False
+    
+    pipeline = pipeline_config.get("pipeline", [])
+    if not pipeline:
+        print(f"[bus] empty pipeline for trigger '{trigger_id}'")
+        return False
+    
+    loop_mode = pipeline_config.get("loop", False)
+    
+    _busy = True
+    try:
+        if loop_mode:
+            # Циклический режим - один сценарий за раз
+            state = cfg.get_state()
+            positions = state.setdefault("trigger_positions", {})
+            pos = positions.get(trigger_id, 0) % len(pipeline)
+            
+            item = pipeline[pos]
+            # Backward compatibility: support both string and dict format
+            scenario_name = item["scenario"] if isinstance(item, dict) else item
+            _run_scenario(scenario_name)
+            
+            # Инкремент позиции для следующего вызова
+            positions[trigger_id] = (pos + 1) % len(pipeline)
+            cfg.save_state()
+        else:
+            # Последовательный режим - все подряд
+            for item in pipeline:
+                # Backward compatibility: support both string and dict format
+                scenario_name = item["scenario"] if isinstance(item, dict) else item
+                _run_scenario(scenario_name)
+    finally:
+        _busy = False
+        _apply_cooldown()
+    
+    return True
 
-    scenario_name = cfg.get_config().get("passive", {}).get(trigger_name)
-    if not scenario_name:
+
+def fire(trigger_name, priority=PRIORITY_NORMAL):
+    """Пассивный триггер с поддержкой нового формата pipeline."""
+    conf = cfg.get_config()
+    trigger_config = conf.get("passive", {}).get(trigger_name)
+    
+    if not trigger_config:
         print("[bus] нет привязки для пассивного триггера:", trigger_name)
+        return False
+    
+    # Обратная совместимость: строка → конвертировать в pipeline
+    if isinstance(trigger_config, str):
+        trigger_config = {
+            "pipeline": [trigger_config],
+            "loop": False
+        }
+    
+    return execute_pipeline(trigger_config, f"passive_{trigger_name}", priority)
+
+
+def fire_scenario(scenario_name, priority=PRIORITY_NORMAL):
+    """Запускает сценарий напрямую по имени (для auto-boot и других служебных задач)."""
+    global _busy
+    if not _can_fire(priority):
         return False
 
     _busy = True
@@ -81,13 +221,8 @@ def fire(trigger_name, priority=PRIORITY_NORMAL):
 
 
 def fire_active(item_id):
-    global _busy
-    if not _can_fire(PRIORITY_NORMAL):
-        return False
-
-    conf  = cfg.get_config()
-    state = cfg.get_state()
-
+    """Активный триггер (меню) с поддержкой нового формата pipeline."""
+    conf = cfg.get_config()
     menu = conf.get("active_menu", [])
     item = _find_item(menu, item_id)
 
@@ -95,24 +230,24 @@ def fire_active(item_id):
         print("[bus] active item не найден:", item_id)
         return False
 
+    # Новый формат: {"pipeline": [...], "loop": true}
+    if "pipeline" in item:
+        return execute_pipeline(item, f"active_{item_id}", PRIORITY_NORMAL)
+    
+    # Обратная совместимость: старый формат "sequence"
     sequence = item.get("sequence", [])
     if not sequence:
         print("[bus] пустой sequence у:", item_id)
         return False
-
-    positions     = state.setdefault("seq_positions", {})
-    pos           = positions.get(item_id, 0) % len(sequence)
-    scenario_name, _ = _resolve_seq_entry(sequence[pos])
-
-    _busy = True
-    try:
-        _run_scenario(scenario_name)
-        positions[item_id] = (pos + 1) % len(sequence)
-        cfg.save_state()
-    finally:
-        _busy = False
-        _apply_cooldown()
-    return True
+    
+    # Конвертировать sequence в pipeline format
+    pipeline = [_resolve_seq_entry(entry)[0] for entry in sequence]
+    pipeline_config = {
+        "pipeline": pipeline,
+        "loop": True  # sequence всегда был циклическим
+    }
+    
+    return execute_pipeline(pipeline_config, f"active_{item_id}", PRIORITY_NORMAL)
 
 
 def is_busy():
@@ -121,7 +256,7 @@ def is_busy():
 
 def get_next_action_name(item_id):
     """Возвращает имя следующего действия для дисплея (без побочных эффектов)."""
-    conf  = cfg.get_config()
+    conf = cfg.get_config()
     state = cfg.get_state()
 
     menu = conf.get("active_menu", [])
@@ -130,11 +265,28 @@ def get_next_action_name(item_id):
     if not item:
         return ""
 
+    # Новый формат: pipeline
+    if "pipeline" in item:
+        pipeline = item.get("pipeline", [])
+        if not pipeline:
+            return ""
+        
+        loop_mode = item.get("loop", False)
+        if loop_mode:
+            positions = state.get("trigger_positions", {})
+            pos = positions.get(f"active_{item_id}", 0) % len(pipeline)
+            return pipeline[pos]
+        else:
+            # Для loop=false показываем первый сценарий
+            return pipeline[0]
+    
+    # Обратная совместимость: старый sequence
     sequence = item.get("sequence", [])
     if not sequence:
         return ""
 
-    pos = state.get("seq_positions", {}).get(item_id, 0) % len(sequence)
+    positions = state.get("seq_positions", {})
+    pos = positions.get(item_id, 0) % len(sequence)
     _, display_name = _resolve_seq_entry(sequence[pos])
     return display_name
 
@@ -170,91 +322,40 @@ def _apply_cooldown():
 # ── Internal: scenario execution ──────────────────────────────────────────
 
 def _run_scenario(name):
+    """Выполнение сценария с поддержкой множественных outputs"""
     scenarios = cfg.get_config().get("scenarios", {})
-    steps     = scenarios.get(name)
+    steps = scenarios.get(name)
 
     if not steps:
         print("[bus] сценарий не найден:", name)
         return
 
-    if not supervisor.runtime.usb_connected:
-        print("[bus] USB не подключён — пропуск")
-        return
-
     print("[bus] →", name)
     for step in steps:
-        act = step.get("action")
-        try:
-            if act == "key":
-                keys = _parse_combo(step.get("combo", ""))
-                if keys:
-                    _kbd.press(*keys)
-                    _kbd.release_all()
-
-            elif act == "type":
-                _layout.write(step.get("value", ""))
-
-            elif act == "wait":
-                time.sleep(step.get("ms", 0) / 1000.0)
-
-            elif act == "enter":
-                count = max(1, min(step.get("count", 1), 10))
-                for _ in range(count):
-                    _kbd.press(Keycode.ENTER)
-                    _kbd.release_all()
-                    time.sleep(0.05)
-
-        except Exception as e:
-            print("[bus] ошибка шага '", act, "':", e)
+        # Специальный случай: {"wait": 500} — короткий формат паузы
+        if "wait" in step:
             try:
-                _kbd.release_all()
-            except Exception:
-                pass
+                time.sleep(step.get("wait", 0) / 1000.0)
+            except Exception as e:
+                print("[bus] ошибка wait:", e)
+            continue
+        
+        # Специальный случай: {"action": "wait", "ms": 500} — старый формат
+        if "action" in step and step["action"] == "wait":
+            try:
+                time.sleep(step.get("ms", 0) / 1000.0)
+            except Exception as e:
+                print("[bus] ошибка wait:", e)
+            continue
+        
+        # Определяем output (default = "hid" для обратной совместимости)
+        output_name = step.get("output", "hid")
+        
+        # Выполняем через outputs manager
+        success = _outputs_manager.execute(output_name, step)
+        if not success:
+            print(f"[bus] WARNING: step failed for output '{output_name}'")
+            # Не прерываем сценарий — продолжаем выполнение
 
     print("[bus] ✓", name)
 
-
-# ── Internal: key map ──────────────────────────────────────────────────────
-
-def _build_key_map():
-    km = {
-        "ctrl":      Keycode.CONTROL,
-        "alt":       Keycode.ALT,
-        "shift":     Keycode.SHIFT,
-        "super":     Keycode.GUI,
-        "win":       Keycode.GUI,
-        "enter":     Keycode.ENTER,
-        "escape":    Keycode.ESCAPE,
-        "esc":       Keycode.ESCAPE,
-        "space":     Keycode.SPACEBAR,
-        "tab":       Keycode.TAB,
-        "backspace": Keycode.BACKSPACE,
-        "delete":    Keycode.DELETE,
-        "up":        Keycode.UP_ARROW,
-        "down":      Keycode.DOWN_ARROW,
-        "left":      Keycode.LEFT_ARROW,
-        "right":     Keycode.RIGHT_ARROW,
-    }
-    for i in range(12):
-        km["f" + str(i + 1)] = getattr(Keycode, "F" + str(i + 1))
-    for i in range(26):
-        c = chr(ord('a') + i)
-        km[c] = getattr(Keycode, c.upper())
-    for digit, name in {
-        "0": "ZERO", "1": "ONE", "2": "TWO", "3": "THREE", "4": "FOUR",
-        "5": "FIVE", "6": "SIX", "7": "SEVEN", "8": "EIGHT", "9": "NINE"
-    }.items():
-        km[digit] = getattr(Keycode, name)
-    return km
-
-
-def _parse_combo(combo_str):
-    keys = []
-    for part in combo_str.lower().split("+"):
-        part = part.strip()
-        kc   = _key_map.get(part)
-        if kc:
-            keys.append(kc)
-        else:
-            print("[bus] неизвестная клавиша:", part)
-    return keys

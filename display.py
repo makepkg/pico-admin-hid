@@ -41,6 +41,7 @@ class DisplayManager:
 
         displayio.release_displays()
         i2c = busio.I2C(scl=scl, sda=sda, frequency=400_000)
+        self.i2c = i2c
 
         # ИСПРАВЛЕНО: i2cdisplaybus.I2CDisplayBus вместо displayio.I2CDisplay
         bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=_ADDR)

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pico Macro Pad — Config Studio</title>
+    <title>Pico Commander — Config Studio</title>
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -281,6 +281,11 @@
             padding: 8px;
             border-radius: 8px;
             border: 1px solid var(--border);
+        }
+
+        .sensor-item-input {
+            padding: 4px 8px;
+            font-size: 0.8rem;
         }
 
         /* Tabs Control */
@@ -563,6 +568,9 @@
         .type-type { color: var(--accent-green); }
         .type-wait { color: var(--accent-orange); }
         .type-enter { color: var(--text-main); }
+        .type-gpio_pulse { color: var(--accent-green); }
+        .type-gpio_hold { color: var(--accent-green); }
+        .type-gpio_toggle { color: var(--accent-green); }
 
         .step-fields {
             display: flex;
@@ -634,6 +642,155 @@
         .text-accent {
             color: var(--accent-cyan);
         }
+
+        /* Empty Scenario Modal */
+        #empty-scenario-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 11, 16, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #empty-scenario-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: var(--shadow);
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-main);
+        }
+
+        .modal-description {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        /* Output Cards */
+        .output-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .output-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .output-type-badge {
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-weight: 600;
+        }
+
+        .badge-hid {
+            background: rgba(0, 229, 255, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(0, 229, 255, 0.3);
+        }
+
+        .badge-gpio {
+            background: rgba(0, 255, 136, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .info-box {
+            margin-top: 8px;
+            padding: 8px;
+            background: var(--bg-main);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .info-box b {
+            color: var(--text-main);
+        }
+
+        .output-name-display {
+            font-family: var(--font-mono);
+            color: var(--accent-green);
+            font-size: 0.85rem;
+        }
+
+        /* Tooltip icon */
+        .tooltip-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(139, 146, 182, 0.3);
+            color: var(--text-muted);
+            font-size: 10px;
+            font-weight: 700;
+            cursor: help;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+
+        .tooltip-icon:hover {
+            background: rgba(139, 146, 182, 0.5);
+            color: var(--text-main);
+        }
+
+        /* Global tooltip */
+        #global-tooltip {
+            position: fixed;
+            z-index: 99999;
+            background: var(--bg-panel);
+            border: 1px solid var(--accent-cyan);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            pointer-events: none;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            font-weight: 400;
+            font-family: var(--font-outfit);
+        }
+
+        /* Output description */
+        .output-description {
+            font-size: 12px;
+            color: #888;
+            margin: 2px 0 10px 0;
+        }
     </style>
 </head>
 <body>
@@ -676,11 +833,17 @@
                         <input type="number" id="dev-cooldown" onchange="updateDeviceField('cooldown_ms', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('cooldown_ms', parseInt(this.value)); this.blur(); }">
                     </div>
                     <div class="form-group">
-                        <label for="dev-screen-timeout">Screen Timeout (seconds)</label>
+                        <label for="dev-screen-timeout" style="display: flex; align-items: center;">
+                            Screen Timeout (seconds)
+                            <span class="tooltip-icon" data-tip="Seconds of inactivity before screensaver activates">?</span>
+                        </label>
                         <input type="number" id="dev-screen-timeout" onchange="updateDeviceField('screen_timeout_s', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('screen_timeout_s', parseInt(this.value)); this.blur(); }" placeholder="0 to disable">
                     </div>
                     <div class="form-group">
-                        <label for="dev-screensaver">Screensaver Mode</label>
+                        <label for="dev-screensaver" style="display: flex; align-items: center;">
+                            Screensaver Mode
+                            <span class="tooltip-icon" data-tip="Visual animation shown when device is idle">?</span>
+                        </label>
                         <select id="dev-screensaver" onchange="updateDeviceField('screensaver', this.value)">
                             <option value="off">Off (Screen turns black)</option>
                             <option value="tesseract">4D Tesseract Animation</option>
@@ -728,11 +891,32 @@
             </div>
 
             <div>
+                <h3 class="section-title">Inputs</h3>
+                
+                <div>
+                    <h4 class="section-title" style="font-size: 0.8rem; margin-top: 1rem;">
+                        <span>Hall Sensors</span>
+                        <button class="btn btn-sm btn-primary" onclick="addHallSensor()" style="padding: 2px 6px;">+ Add</button>
+                    </h4>
+                    <div id="hall-sensors-container" style="display:flex; flex-direction:column; gap:8px;">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <h4 class="section-title" style="font-size: 0.8rem;">Power Monitor</h4>
+                    <div id="ina226-config-container" class="card">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <div>
                 <h3 class="section-title">
-                    <span>Hall Sensors</span>
-                    <button class="btn btn-sm btn-primary" onclick="addHallSensor()" style="padding: 2px 6px;">+ Add</button>
+                    <span>Outputs Configuration</span>
+                    <button class="btn btn-sm btn-primary" onclick="addGpioOutput()" style="padding: 2px 6px;">+ GPIO</button>
                 </h3>
-                <div id="hall-sensors-container" style="display:flex; flex-direction:column; gap:8px;">
+                <div id="outputs-config-container" style="display:flex; flex-direction:column; gap:10px;">
                     <!-- Loaded dynamically -->
                 </div>
             </div>
@@ -771,7 +955,10 @@
             <div id="tab-scenarios" class="tab-content">
                 <div class="scenarios-grid">
                     <div class="scenario-selector">
-                        <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); padding: 5px;">Scenarios</h4>
+                        <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); padding: 5px; display: flex; align-items: center;">
+                            Scenarios
+                            <span class="tooltip-icon" data-tip="Scenarios are reusable action sequences. Assign them to triggers via pipelines. Each scenario targets one output type (HID or GPIO).">?</span>
+                        </h4>
                         <input type="text" id="scenario-search-input" placeholder="Search scenarios..." oninput="filterScenariosList(this.value)" style="margin-bottom: 8px;">
                         <div id="scenarios-list" style="display:flex; flex-direction:column; gap:6px;"></div>
                         <button class="btn" style="margin-top: 10px; width: 100%; justify-content: center;" onclick="addNewScenario()">+ Add Scenario</button>
@@ -839,7 +1026,10 @@
                     <input type="text" id="inspect-id" onblur="updateInspectedItemId(this.value)" onkeydown="if(event.key==='Enter') { updateInspectedItemId(this.value); this.blur(); }" placeholder="e.g., menu_item_1 (a-z, 0-9, _ only)" style="font-family: var(--font-mono);">
                 </div>
                 <div class="form-group">
-                    <label for="inspect-label">Display Label</label>
+                    <label for="inspect-label" style="display: flex; align-items: center;">
+                        <span id="inspect-label-text">Display Label</span>
+                        <span class="tooltip-icon tooltip-icon--left" id="inspect-label-tooltip" data-tip="Text shown on screen for this action">?</span>
+                    </label>
                     <input type="text" id="inspect-label" onblur="updateInspectedItem('label', this.value)" onkeydown="if(event.key==='Enter') { updateInspectedItem('label', this.value); this.blur(); }">
                 </div>
 
@@ -865,11 +1055,22 @@
 
                 <div id="inspect-sequence-panel" class="form-group">
                     <label style="display:flex; justify-content:space-between; align-items: center;">
-                        <span>Action sequence (optional)</span>
-                        <button class="btn" style="padding: 2px 8px; font-size: 0.8rem;" onclick="addSequenceEntry()">+ Add</button>
+                        <span style="display: flex; align-items: center;">
+                            Pipeline (optional)
+                            <span class="tooltip-icon tooltip-icon--left" id="inspect-pipeline-tooltip" data-tip="Scenarios that run when this action is triggered">?</span>
+                        </span>
+                        <button class="btn" style="padding: 2px 8px; font-size: 0.8rem;" onclick="addPipelineEntry()">+ Add</button>
                     </label>
-                    <div id="inspect-sequence-hint" style="display:none; font-size:0.8rem; color:var(--text-muted); padding:8px; background:rgba(0,229,255,0.05); border-left:2px solid var(--accent-cyan); border-radius:4px; margin-top:4px;">
-                        💡 For folders: sequence executes <b>when entering</b> the folder, then opens submenu
+                    <div class="checkbox-group" style="margin-top: 8px;">
+                        <input type="checkbox" id="inspect-loop-mode" onchange="updateInspectedItemLoop(this.checked)">
+                        <label for="inspect-loop-mode" style="display: flex; align-items: center;">
+                            Loop mode
+                            <span class="tooltip-icon tooltip-icon--left" id="inspect-loop-tooltip" data-tip="ON: each press = next scenario in order. OFF: all scenarios fire at once">?</span>
+                        </label>
+                    </div>
+                    <div id="inspect-sequence-hint" style="display:none; font-size:0.8rem; color:var(--text-muted); padding:8px; background:rgba(0,229,255,0.05); border-left:2px solid var(--accent-cyan); border-radius:4px; margin-top:8px;">
+                        💡 <b>Loop false:</b> all scenarios run sequentially<br>
+                        💡 <b>Loop true:</b> each press → next scenario in cycle
                     </div>
                     <div id="inspect-sequence-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
                 </div>
@@ -886,6 +1087,28 @@
 
     <!-- Custom Context Menu (Right Click) -->
     <div id="custom-context-menu" class="context-menu"></div>
+
+    <!-- Empty Scenario Modal -->
+    <div id="empty-scenario-modal" onclick="closeEmptyScenarioModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2 class="modal-title" style="margin: 0;">⚙️ Choose Output Type</h2>
+                <button onclick="closeEmptyScenarioModal()" style="background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; line-height: 1; padding: 0; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: var(--transition);" onmouseover="this.style.background='var(--bg-card-hover)'; this.style.color='var(--accent-red)';" onmouseout="this.style.background='none'; this.style.color='var(--text-muted)';" title="Cancel and delete empty scenario">&times;</button>
+            </div>
+            <p class="modal-description">
+                This scenario is empty. Select which output type you want to use. This determines available step types (HID keyboard actions or GPIO pin control).
+            </p>
+            <div class="form-group">
+                <label for="modal-output-select">Select Output:</label>
+                <select id="modal-output-select" style="font-size: 1rem; padding: 10px;">
+                    <!-- Options populated dynamically -->
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 1.5rem;">
+                <button class="btn btn-primary" onclick="confirmOutputSelection()" style="flex: 1;">Confirm</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Core state
@@ -905,10 +1128,6 @@
         // Default skeleton if loaded empty
         const defaultSkeleton = {
             hardware: {
-                hall_sensors: [
-                    {"id": "hall_sensor_1", "pin": 15, "active_low": true},
-                    {"id": "hall_sensor_2", "pin": 16, "active_low": true}
-                ],
                 button_pin: 24,
                 led_pin: 25,
                 encoder_clk: 6,
@@ -917,6 +1136,7 @@
                 display_sda: 4,
                 display_scl: 5
             },
+            inputs: {},
             device: {
                 debounce_ms: 300,
                 cooldown_ms: 5000,
@@ -924,11 +1144,7 @@
                 screen_timeout_s: 15,
                 screensaver: "tesseract"
             },
-            passive: {
-                hall_sensor_1: "scenario_shutdown",
-                hall_sensor_2: "scenario_shutdown",
-                btn_double: "scenario_lock"
-            },
+            passive: {},
             active_menu: [],
             scenarios: {}
         };
@@ -976,10 +1192,21 @@
                     else if (currentTab && currentTab.id === 'tab-scenarios' && activeScenarioName) {
                         if (confirm(`Delete scenario "${activeScenarioName}" and all its steps?`)) {
                             delete configData.scenarios[activeScenarioName];
+                            
+                            // Clear references in GPIO outputs default_scenario
+                            if (configData.outputs) {
+                                Object.values(configData.outputs).forEach(output => {
+                                    if (output.type === 'gpio' && output.default_scenario === activeScenarioName) {
+                                        delete output.default_scenario;
+                                    }
+                                });
+                            }
+                            
                             activeScenarioName = null;
                             renderScenariosList();
                             updateScenarioEditor();
                             renderPassiveTriggers();
+                            renderOutputsConfig(); // Re-render GPIO outputs to show "Create" button
                             if (selectedItemRef) renderInspectorSequence();
                         }
                     }
@@ -989,11 +1216,19 @@
 
         // Switch Workspace Tabs
         function switchTab(tabId) {
-            // If leaving raw JSON tab, try to sync changes
+            // Get current tab before switching
             const currentTab = document.querySelector('.tab-content.active');
+            
+            // If leaving raw JSON tab, try to sync changes
             if (currentTab && currentTab.id === 'tab-raw') {
                 const textarea = document.getElementById('raw-json-textarea');
                 syncRawJson(textarea.value);
+            }
+
+            // If leaving any tab (Outputs in sidebar is always visible on tab-menu and tab-scenarios)
+            // Serialize outputs configuration to save unsaved changes
+            if (currentTab && (currentTab.id === 'tab-menu' || currentTab.id === 'tab-scenarios')) {
+                serializeOutputsToConfig();
             }
 
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -1078,10 +1313,39 @@
             configData = {
                 hardware: obj.hardware || {},
                 device: obj.device || {},
+                inputs: obj.inputs || {},
+                outputs: obj.outputs || {},
                 passive: obj.passive || {},
                 active_menu: obj.active_menu || [],
                 scenarios: obj.scenarios || {}
             };
+
+            // Validate passive triggers: if loop: false and pipeline.length > 1, truncate to first element
+            if (configData.passive) {
+                Object.keys(configData.passive).forEach(triggerId => {
+                    const trigger = configData.passive[triggerId];
+                    if (trigger && trigger.pipeline && Array.isArray(trigger.pipeline)) {
+                        if (!trigger.loop && trigger.pipeline.length > 1) {
+                            console.warn(`⚠️ Passive trigger "${triggerId}": loop is OFF but pipeline has ${trigger.pipeline.length} scenarios. Truncating to first scenario.`);
+                            trigger.pipeline = [trigger.pipeline[0]];
+                        }
+                    }
+                });
+            }
+
+            // Validate active menu: if loop: false and pipeline.length > 1, truncate to first element
+            function validateMenuPipelines(items) {
+                items.forEach(item => {
+                    if (item.pipeline && Array.isArray(item.pipeline)) {
+                        if (!item.loop && item.pipeline.length > 1) {
+                            console.warn(`⚠️ Menu item "${item.id}": loop is OFF but pipeline has ${item.pipeline.length} scenarios. Truncating to first scenario.`);
+                            item.pipeline = [item.pipeline[0]];
+                        }
+                    }
+                    if (item.submenu) validateMenuPipelines(item.submenu);
+                });
+            }
+            validateMenuPipelines(configData.active_menu);
 
             // Sidebar values
             document.getElementById('dev-armed').checked = !!configData.device.armed;
@@ -1099,7 +1363,8 @@
             document.getElementById('hw-sda').value = configData.hardware.display_sda || 4;
             document.getElementById('hw-scl').value = configData.hardware.display_scl || 5;
 
-            renderHallSensors();
+            renderInputsConfig();
+            renderOutputsConfig();
             renderPassiveTriggers();
             renderMenuTree();
             renderScenariosList();
@@ -1182,8 +1447,11 @@
                     if (!item.id || item.id.trim() === '') {
                         warnings.push(`• Menu item "${path}/${item.label || '(no label)'}": Missing ID`);
                     }
-                    if (item.sequence && item.sequence.length === 0 && !item.submenu) {
-                        warnings.push(`• Menu item "${path}/${item.label || item.id}": Has empty sequence (no scenarios bound)`);
+                    // Check both old sequence and new pipeline formats
+                    const hasEmptyPipeline = (item.pipeline && item.pipeline.length === 0) || 
+                                            (item.sequence && item.sequence.length === 0);
+                    if (hasEmptyPipeline && !item.submenu) {
+                        warnings.push(`• Menu item "${path}/${item.label || item.id}": Has empty pipeline (no scenarios bound)`);
                     }
                     if (item.submenu) {
                         checkMenuItems(item.submenu, `${path}/${item.label || item.id}`);
@@ -1203,6 +1471,92 @@
                     }
                 });
             }
+
+            // ═══ NEW: Pin Conflicts ═══
+
+            // 1. Дублирование пинов между hall sensors
+            const hallPins = Object.values(configData.inputs || {})
+                .filter(i => i.type === "hall")
+                .map(i => i.pin);
+            const dupHall = hallPins.filter((p, i) => hallPins.indexOf(p) !== i);
+            if (dupHall.length > 0) {
+                const uniqueDups = [...new Set(dupHall)];
+                uniqueDups.forEach(pin => {
+                    const sensors = Object.entries(configData.inputs || {})
+                        .filter(([id, cfg]) => cfg.type === "hall" && cfg.pin === pin)
+                        .map(([id]) => id);
+                    warnings.push(`• Pin ${pin}: Used by multiple hall sensors (${sensors.join(', ')})`);
+                });
+            }
+
+            // Дублирование пинов между GPIO outputs
+            const gpioPins = Object.entries(configData.outputs || {})
+                .filter(([name, cfg]) => cfg.type === "gpio")
+                .map(([name, cfg]) => ({ name, pin: cfg.pin }));
+            const seenGpioPins = new Map();
+            gpioPins.forEach(({ name, pin }) => {
+                if (seenGpioPins.has(pin)) {
+                    seenGpioPins.get(pin).push(name);
+                } else {
+                    seenGpioPins.set(pin, [name]);
+                }
+            });
+            seenGpioPins.forEach((names, pin) => {
+                if (names.length > 1) {
+                    warnings.push(`• Pin ${pin}: Used by multiple GPIO outputs (${names.join(', ')})`);
+                }
+            });
+
+            // Конфликт hall ↔ gpio
+            const hallPinSet = new Set(hallPins);
+            const gpioPinSet = new Set(gpioPins.map(g => g.pin));
+            hallPinSet.forEach(pin => {
+                if (gpioPinSet.has(pin)) {
+                    const hallIds = Object.entries(configData.inputs || {})
+                        .filter(([id, cfg]) => cfg.type === "hall" && cfg.pin === pin)
+                        .map(([id]) => id);
+                    const gpioIds = gpioPins.filter(g => g.pin === pin).map(g => g.name);
+                    warnings.push(`• Pin ${pin}: Used by both hall sensor (${hallIds.join(', ')}) and GPIO output (${gpioIds.join(', ')})`);
+                }
+            });
+
+            // 2. Конфликт с hardware пинами
+            const hwPins = Object.values(configData.hardware || {}).filter(v => typeof v === 'number');
+            const hwPinNames = Object.entries(configData.hardware || {})
+                .filter(([key, val]) => typeof val === 'number')
+                .reduce((acc, [key, val]) => {
+                    acc[val] = key;
+                    return acc;
+                }, {});
+
+            Object.entries(configData.inputs || {}).forEach(([id, inp]) => {
+                if (inp.pin && hwPins.includes(inp.pin)) {
+                    warnings.push(`• Input "${id}": Pin ${inp.pin} conflicts with hardware pin (${hwPinNames[inp.pin]})`);
+                }
+            });
+
+            Object.entries(configData.outputs || {}).forEach(([name, out]) => {
+                if (out.type === "gpio" && out.pin && hwPins.includes(out.pin)) {
+                    warnings.push(`• Output "${name}": Pin ${out.pin} conflicts with hardware pin (${hwPinNames[out.pin]})`);
+                }
+            });
+
+            // 3. Несуществующие сценарии в passive pipelines
+            const scenarioIds = Object.keys(configData.scenarios || {});
+            Object.entries(configData.passive || {}).forEach(([id, t]) => {
+                (t.pipeline || []).forEach(s => {
+                    if (!scenarioIds.includes(s)) {
+                        warnings.push(`• Passive trigger "${id}": References missing scenario "${s}"`);
+                    }
+                });
+            });
+
+            // Несуществующие сценарии в GPIO default_scenario
+            Object.entries(configData.outputs || {}).forEach(([name, out]) => {
+                if (out.type === "gpio" && out.default_scenario && !scenarioIds.includes(out.default_scenario)) {
+                    warnings.push(`• GPIO output "${name}": default_scenario "${out.default_scenario}" does not exist`);
+                }
+            });
 
             return warnings;
         }
@@ -1261,129 +1615,549 @@
             configData.hardware[field] = val;
         }
 
-        // Dynamic Hall Sensors Configuration
-        function renderHallSensors() {
-            const container = document.getElementById('hall-sensors-container');
-            container.innerHTML = '';
+        // ═══════════════════════════════════════════════════════════════
+        // UNIFIED INPUTS CONFIGURATION (Hall Sensors, INA226, etc.)
+        // ═══════════════════════════════════════════════════════════════
 
-            if (!configData.hardware.hall_sensors) {
-                configData.hardware.hall_sensors = [];
+        function renderInputsConfig() {
+            migrateToInputsFormat();  // Backward compatibility
+            
+            const hallContainer = document.getElementById('hall-sensors-container');
+            const inaContainer = document.getElementById('ina226-config-container');
+            
+            if (!configData || !configData.inputs) return;
+            
+            // Render Hall Sensors
+            if (hallContainer) {
+                renderHallSensorsInputs(hallContainer);
             }
+            
+            // Render INA226
+            if (inaContainer) {
+                renderPowerMonitorInput(inaContainer);
+            }
+        }
 
-            if (configData.hardware.hall_sensors.length === 0) {
-                container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:8px;">No sensors defined</div>`;
+        function migrateToInputsFormat() {
+            // Migrate from old hardware.hall_sensors[] and hardware.ina226{} to inputs{}
+            if (!configData.inputs) {
+                configData.inputs = {};
+            }
+            
+            // Migrate hall_sensors - ALWAYS check hardware.hall_sensors even if inputs exists
+            if (configData.hardware && configData.hardware.hall_sensors) {
+                configData.hardware.hall_sensors.forEach(sensor => {
+                    const id = sensor.id || `hall_sensor_${Object.keys(configData.inputs).length + 1}`;
+                    if (!configData.inputs[id]) {
+                        configData.inputs[id] = {
+                            type: "hall",
+                            pin: sensor.pin,
+                            active_low: sensor.active_low !== undefined ? sensor.active_low : true
+                        };
+                    }
+                });
+                delete configData.hardware.hall_sensors;
+            }
+            
+            // Migrate ina226 - ALWAYS check hardware.ina226 even if inputs exists
+            if (configData.hardware && configData.hardware.ina226) {
+                if (!configData.inputs.ina226) {
+                    const oldCfg = configData.hardware.ina226;
+                    configData.inputs.ina226 = {
+                        type: "power_monitor",
+                        enabled: oldCfg.enabled !== undefined ? oldCfg.enabled : false,
+                        trigger_mode: oldCfg.trigger_mode || "percent",
+                        threshold_percent: oldCfg.threshold_percent !== undefined ? oldCfg.threshold_percent : 15,
+                        threshold_voltage: oldCfg.threshold_voltage !== undefined ? oldCfg.threshold_voltage : 16.5,
+                        warning_offset_percent: oldCfg.warning_offset_percent !== undefined ? oldCfg.warning_offset_percent : 5,
+                        cooldown_sec: oldCfg.cooldown_sec !== undefined ? oldCfg.cooldown_sec : 300,
+                        cancel_cooldown_sec: oldCfg.cancel_cooldown_sec !== undefined ? oldCfg.cancel_cooldown_sec : 3600,
+                        read_interval_sec: oldCfg.read_interval_sec !== undefined ? oldCfg.read_interval_sec : 5.0,
+                        warning_enabled: oldCfg.warning_enabled !== false,
+                        warning_blink_interval: oldCfg.warning_blink_interval || 0.5,
+                        warning_canceled_display_sec: oldCfg.warning_canceled_display_sec || 2.0,
+                        splash_interval_sec: oldCfg.splash_interval_sec || 1800,
+                        splash_duration_sec: oldCfg.splash_duration_sec || 6,
+                        battery_max_v: 21.0,
+                        battery_min_v: 15.0,
+                        shunt_ohms: 0.1,
+                        i2c_scl: 5,
+                        i2c_sda: 4,
+                        i2c_address: 64
+                    };
+                }
+                delete configData.hardware.ina226;
+            }
+        }
+
+        function renderHallSensorsInputs(container) {
+            container.innerHTML = '';
+            
+            const hallInputs = Object.entries(configData.inputs).filter(([id, cfg]) => cfg.type === "hall");
+            
+            if (hallInputs.length === 0) {
+                container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:8px;">No hall sensors defined</div>`;
                 return;
             }
-
-            configData.hardware.hall_sensors.forEach((sensor, idx) => {
+            
+            hallInputs.forEach(([inputId, cfg]) => {
                 const row = document.createElement('div');
                 row.className = 'sensor-item-row';
                 row.innerHTML = `
                     <div class="form-group">
-                        <input type="text" value="${escapeHtml(sensor.id)}" placeholder="ID" style="padding:4px 8px; font-size:0.8rem;" onchange="updateHallSensorField(${idx}, 'id', this.value)" onkeydown="if(event.key==='Enter') { updateHallSensorField(${idx}, 'id', this.value); this.blur(); }">
+                        <input type="text" class="sensor-item-input" value="${escapeHtml(inputId)}" placeholder="ID" 
+                            onchange="renameInput('${inputId}', this.value)" 
+                            onkeydown="if(event.key==='Enter') { renameInput('${inputId}', this.value); this.blur(); }">
                     </div>
                     <div class="form-group">
-                        <input type="number" value="${sensor.pin}" placeholder="Pin" style="padding:4px 8px; font-size:0.8rem;" onchange="updateHallSensorField(${idx}, 'pin', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHallSensorField(${idx}, 'pin', parseInt(this.value)); this.blur(); }">
+                        <input type="number" class="sensor-item-input" value="${cfg.pin}" placeholder="Pin" 
+                            onchange="updateInputField('${inputId}', 'pin', parseInt(this.value))" 
+                            onkeydown="if(event.key==='Enter') { updateInputField('${inputId}', 'pin', parseInt(this.value)); this.blur(); }">
                     </div>
                     <div class="checkbox-group" style="justify-content:center;">
-                        <input type="checkbox" ${sensor.active_low ? 'checked' : ''} onchange="updateHallSensorField(${idx}, 'active_low', this.checked)" title="Active Low">
+                        <input type="checkbox" ${cfg.active_low ? 'checked' : ''} 
+                            onchange="updateInputField('${inputId}', 'active_low', this.checked)" 
+                            title="Active Low">
                     </div>
-                    <button class="step-delete-btn" onclick="deleteHallSensor(${idx})" style="padding: 0 4px;">&times;</button>
+                    <button class="step-delete-btn" onclick="deleteInput('${inputId}')" style="padding: 0 4px;">&times;</button>
                 `;
                 container.appendChild(row);
             });
         }
 
+        function renderPowerMonitorInput(container) {
+            const inaConfig = configData.inputs.ina226;
+            
+            if (!inaConfig || inaConfig.type !== "power_monitor") {
+                // Create default if not exists
+                configData.inputs.ina226 = {
+                    type: "power_monitor",
+                    enabled: false,
+                    trigger_mode: "percent",
+                    threshold_percent: 15,
+                    threshold_voltage: 16.5,
+                    warning_offset_percent: 5,
+                    cooldown_sec: 300,
+                    cancel_cooldown_sec: 3600,
+                    read_interval_sec: 5.0,
+                    warning_enabled: true,
+                    warning_blink_interval: 0.5,
+                    warning_canceled_display_sec: 2.0,
+                    splash_interval_sec: 1800,
+                    splash_duration_sec: 6,
+                    battery_max_v: 21.0,
+                    battery_min_v: 15.0,
+                    shunt_ohms: 0.1,
+                    i2c_scl: 5,
+                    i2c_sda: 4,
+                    i2c_address: 64
+                };
+                return renderPowerMonitorInput(container);
+            }
+            
+            const cfg = inaConfig;
+            const isPercent = cfg.trigger_mode === "percent";
+            const isEnabled = cfg.enabled;
+            
+            container.innerHTML = `
+                <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <label style="margin:0;">Enable trigger</label>
+                    <input type="checkbox" ${cfg.enabled ? 'checked' : ''}
+                        onchange="updateInputField('ina226', 'enabled', this.checked); renderInputsConfig(); renderPassiveTriggers();">
+                </div>
+
+                <div style="opacity: ${isEnabled ? '1' : '0.4'}; pointer-events: ${isEnabled ? 'auto' : 'none'}; transition: opacity 0.2s;">
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Trigger mode
+                            <span class="tooltip-icon" data-tip="Percent: triggers based on battery % calculated from voltage range. Voltage: triggers on raw voltage threshold">?</span>
+                        </label>
+                        <select onchange="updateInputField('ina226', 'trigger_mode', this.value); renderInputsConfig();">
+                            <option value="percent" ${isPercent ? 'selected' : ''}>Percent (%)</option>
+                            <option value="voltage" ${!isPercent ? 'selected' : ''}>Voltage (V)</option>
+                        </select>
+                    </div>
+
+                    ${isPercent ? `
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Shutdown threshold (%)
+                            <span class="tooltip-icon" data-tip="Battery level (%) at which shutdown pipeline triggers">?</span>
+                        </label>
+                        <input type="number" value="${cfg.threshold_percent}" min="0" max="100"
+                            onchange="updateInputField('ina226', 'threshold_percent', parseInt(this.value))">
+                    </div>` : `
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Shutdown threshold (V)
+                            <span class="tooltip-icon" data-tip="Raw voltage (V) at which shutdown pipeline triggers">?</span>
+                        </label>
+                        <input type="number" value="${cfg.threshold_voltage}" step="0.1"
+                            onchange="updateInputField('ina226', 'threshold_voltage', parseFloat(this.value))">
+                    </div>`}
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Warning offset ${isPercent ? '(%)' : '(V)'}
+                            <span class="tooltip-icon" data-tip="Warning fires this many % (or V) before the shutdown threshold. Gives time to react">?</span>
+                        </label>
+                        <input type="number" value="${cfg.warning_offset_percent}" min="0"
+                            onchange="updateInputField('ina226', 'warning_offset_percent', parseFloat(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Cooldown after trigger (sec)
+                            <span class="tooltip-icon" data-tip="Seconds to wait before re-triggering after a shutdown trigger fired">?</span>
+                        </label>
+                        <input type="number" value="${cfg.cooldown_sec}" min="0"
+                            onchange="updateInputField('ina226', 'cooldown_sec', parseInt(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Cooldown after cancel (sec)
+                            <span class="tooltip-icon" data-tip="Seconds the 'Canceled' state is held after user cancels the warning">?</span>
+                        </label>
+                        <input type="number" value="${cfg.cancel_cooldown_sec}" min="0"
+                            onchange="updateInputField('ina226', 'cancel_cooldown_sec', parseInt(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            I2C read interval (sec)
+                            <span class="tooltip-icon" data-tip="How often INA226 is polled over I2C. Lower = more responsive, higher = less CPU load">?</span>
+                        </label>
+                        <input type="number" value="${cfg.read_interval_sec}" min="1" step="0.5"
+                            onchange="updateInputField('ina226', 'read_interval_sec', parseFloat(this.value))">
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); margin: 12px 0 8px;"></div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
+                        HARDWARE CONFIGURATION
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Battery Max Voltage (V)
+                            <span class="tooltip-icon" data-tip="Voltage corresponding to 100% battery. Used to calculate percent from raw voltage">?</span>
+                        </label>
+                        <input type="number" value="${cfg.battery_max_v}" step="0.1"
+                            onchange="updateInputField('ina226', 'battery_max_v', parseFloat(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Battery Min Voltage (V)
+                            <span class="tooltip-icon" data-tip="Voltage corresponding to 0% battery. Used to calculate percent from raw voltage">?</span>
+                        </label>
+                        <input type="number" value="${cfg.battery_min_v}" step="0.1"
+                            onchange="updateInputField('ina226', 'battery_min_v', parseFloat(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Shunt Resistance (Ohms)
+                            <span class="tooltip-icon" data-tip="Resistance of the shunt resistor in your INA226 circuit. Used to calculate current">?</span>
+                        </label>
+                        <input type="number" value="${cfg.shunt_ohms}" step="0.01"
+                            onchange="updateInputField('ina226', 'shunt_ohms', parseFloat(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            I2C Address (decimal)
+                            <span class="tooltip-icon" data-tip="I2C address of the INA226 chip in decimal. Default is 64 (0x40)">?</span>
+                        </label>
+                        <input type="number" value="${cfg.i2c_address}" min="0" max="127"
+                            onchange="updateInputField('ina226', 'i2c_address', parseInt(this.value))">
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); margin: 12px 0 8px;"></div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
+                        WARNING SCREEN
+                    </div>
+
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                        <label style="margin:0;">Enable warning screen</label>
+                        <input type="checkbox" ${cfg.warning_enabled !== false ? 'checked' : ''}
+                            onchange="updateInputField('ina226', 'warning_enabled', this.checked)">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Blink interval (sec)
+                            <span class="tooltip-icon" data-tip="How fast the warning screen blinks in seconds">?</span>
+                        </label>
+                        <input type="number" value="${cfg.warning_blink_interval ?? 0.5}" step="0.1" min="0.1"
+                            onchange="updateInputField('ina226', 'warning_blink_interval', parseFloat(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            «Canceled» display duration (sec)
+                            <span class="tooltip-icon" data-tip="How long the 'Canceled' message stays on screen after user dismisses the warning">?</span>
+                        </label>
+                        <input type="number" value="${cfg.warning_canceled_display_sec ?? 2.0}" step="0.5" min="0.5"
+                            onchange="updateInputField('ina226', 'warning_canceled_display_sec', parseFloat(this.value))">
+                    </div>
+
+                    <div style="border-top: 1px solid var(--border); margin: 12px 0 8px;"></div>
+                    <div style="font-size:11px; color:var(--text-muted); margin-bottom:8px;">
+                        SPLASH DURING SCREENSAVER
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Show splash every (sec)
+                            <span class="tooltip-icon" data-tip="How often the INA226 splash (battery info) appears during screensaver, in seconds">?</span>
+                        </label>
+                        <input type="number" value="${cfg.splash_interval_sec ?? 1800}" min="30"
+                            onchange="updateInputField('ina226', 'splash_interval_sec', parseInt(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Splash duration (sec)
+                            <span class="tooltip-icon" data-tip="How long the INA226 splash stays visible before returning to screensaver">?</span>
+                        </label>
+                        <input type="number" value="${cfg.splash_duration_sec ?? 6}" min="1"
+                            onchange="updateInputField('ina226', 'splash_duration_sec', parseInt(this.value))">
+                    </div>
+                </div>
+            `;
+        }
+
         function addHallSensor() {
-            const count = configData.hardware.hall_sensors ? configData.hardware.hall_sensors.length + 1 : 1;
+            const count = Object.keys(configData.inputs).filter(k => configData.inputs[k].type === "hall").length + 1;
             const newId = `hall_sensor_${count}`;
-            const newSensor = {
-                id: newId,
+            
+            configData.inputs[newId] = {
+                type: "hall",
                 pin: 15,
                 active_low: true
             };
-            if (!configData.hardware.hall_sensors) configData.hardware.hall_sensors = [];
-            configData.hardware.hall_sensors.push(newSensor);
-
+            
             if (!configData.passive[newId]) {
-                configData.passive[newId] = "scenario_shutdown";
+                configData.passive[newId] = { pipeline: ["scenario_shutdown"], loop: false };
             }
-
-            renderHallSensors();
+            
+            renderInputsConfig();
             renderPassiveTriggers();
         }
 
-        function updateHallSensorField(idx, field, val) {
-            const sensor = configData.hardware.hall_sensors[idx];
-            const oldId = sensor.id;
+        function updateInputField(inputId, field, val) {
+            if (!configData.inputs[inputId]) return;
+            configData.inputs[inputId][field] = val;
+        }
 
-            if (field === 'id') {
-                val = val.trim().replace(/\s+/g, '_').toLowerCase();
-                const exists = configData.hardware.hall_sensors.some((s, sIdx) => s.id === val && sIdx !== idx);
-                if (exists) {
-                    alert('Sensor ID must be unique!');
-                    renderHallSensors();
-                    return;
-                }
-                sensor.id = val;
-
-                if (configData.passive[oldId]) {
-                    configData.passive[val] = configData.passive[oldId];
-                    delete configData.passive[oldId];
-                }
-            } else {
-                sensor[field] = val;
+        function renameInput(oldId, newId) {
+            newId = newId.trim().replace(/\s+/g, '_').toLowerCase();
+            
+            if (oldId === newId) return;
+            
+            if (configData.inputs[newId]) {
+                alert('Input ID must be unique!');
+                renderInputsConfig();
+                return;
             }
-
-            renderHallSensors();
+            
+            // Rename in inputs
+            configData.inputs[newId] = configData.inputs[oldId];
+            delete configData.inputs[oldId];
+            
+            // Rename in passive triggers
+            if (configData.passive[oldId]) {
+                configData.passive[newId] = configData.passive[oldId];
+                delete configData.passive[oldId];
+            }
+            
+            renderInputsConfig();
             renderPassiveTriggers();
         }
 
-        function deleteHallSensor(idx) {
-            const sensor = configData.hardware.hall_sensors[idx];
-            if (sensor && configData.passive[sensor.id]) {
-                delete configData.passive[sensor.id];
+        function deleteInput(inputId) {
+            if (configData.passive[inputId]) {
+                delete configData.passive[inputId];
             }
-            configData.hardware.hall_sensors.splice(idx, 1);
-            renderHallSensors();
+            delete configData.inputs[inputId];
+            renderInputsConfig();
             renderPassiveTriggers();
         }
 
         // Passive sensors list
         function renderPassiveTriggers() {
             const list = document.getElementById('passive-triggers-list');
+            if (!list) return;
+            if (!configData || !configData.passive) return;
+            
+            migrateToInputsFormat();  // Ensure inputs format
+            
             list.innerHTML = '';
 
             const triggers = [];
-            if (configData.hardware.hall_sensors) {
-                configData.hardware.hall_sensors.forEach(s => {
-                    triggers.push({ id: s.id, label: `Hall sensor (${s.id})` });
+            
+            // Collect all inputs (hall sensors, power monitors, etc.)
+            if (configData.inputs) {
+                Object.entries(configData.inputs).forEach(([inputId, inputCfg]) => {
+                    if (inputCfg.type === "hall") {
+                        triggers.push({ id: inputId, label: `Hall sensor (${inputId})` });
+                    } else if (inputCfg.type === "power_monitor") {
+                        triggers.push({ id: inputId, label: `Power Monitor (${inputId})` });
+                    }
                 });
             }
+            
+            // Button double-click
             triggers.push({ id: 'btn_double', label: 'Button Double Click' });
 
             triggers.forEach(t => {
-                const currentScenario = configData.passive[t.id] || "";
+                let triggerConfig = configData.passive[t.id];
+                
+                // Backward compatibility: string → convert to new format
+                if (typeof triggerConfig === 'string') {
+                    triggerConfig = {
+                        pipeline: [triggerConfig],
+                        loop: false
+                    };
+                    configData.passive[t.id] = triggerConfig;
+                }
+                
+                // Ensure default structure
+                if (!triggerConfig) {
+                    triggerConfig = { pipeline: [], loop: false };
+                    configData.passive[t.id] = triggerConfig;
+                }
 
-                const formGroup = document.createElement('div');
-                formGroup.className = 'form-group';
-                formGroup.style.marginBottom = '8px';
-                formGroup.innerHTML = `
-                    <label>${t.label}</label>
-                    <select onchange="updatePassiveTrigger('${t.id}', this.value)">
-                        <option value="">(None)</option>
-                        ${getScenariosOptions(currentScenario)}
-                    </select>
+                // Check if input is enabled (for visual indication)
+                const inputCfg = configData.inputs[t.id];
+                const isEnabled = inputCfg ? (inputCfg.enabled !== false) : true; // hall sensors always enabled
+
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.marginBottom = '10px';
+                card.style.opacity = isEnabled ? '1' : '0.5';
+                card.style.background = isEnabled ? '' : 'rgba(139, 146, 182, 0.05)';
+                card.style.transition = 'opacity 0.2s, background 0.2s';
+                
+                // Determine if Add button should be disabled
+                const shouldDisableAdd = !triggerConfig.loop && triggerConfig.pipeline.length > 0;
+                const addButtonDisabled = shouldDisableAdd ? 'disabled' : '';
+                const addButtonStyle = shouldDisableAdd ? 'opacity: 0.5; cursor: not-allowed;' : '';
+                const addButtonTitle = shouldDisableAdd ? 'Cannot add more scenarios when Loop is OFF (only one scenario allowed)' : '';
+                
+                const disabledIndicator = !isEnabled ? '<span style="color:var(--text-muted); font-size:0.75rem; margin-left:8px;">(disabled)</span>' : '';
+                
+                card.innerHTML = `
+                    <div style="font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="display: flex; align-items: center;">
+                            ${t.label}${disabledIndicator}
+                            <span class="tooltip-icon" data-tip="List of scenarios executed when this trigger fires">?</span>
+                        </span>
+                        <button class="btn btn-sm btn-primary" onclick="addPassivePipelineScenario('${t.id}')" 
+                                style="padding: 2px 6px; ${addButtonStyle}" 
+                                ${addButtonDisabled}
+                                title="${addButtonTitle}">+ Add</button>
+                    </div>
+                    <div class="checkbox-group" style="margin-bottom: 8px;">
+                        <input type="checkbox" id="passive-loop-${t.id}" ${triggerConfig.loop ? 'checked' : ''}
+                            onchange="updatePassiveLoop('${t.id}', this.checked)">
+                        <label for="passive-loop-${t.id}" style="display: flex; align-items: center;">
+                            Loop mode
+                            <span class="tooltip-icon" data-tip="ON: one trigger = one scenario (cycles). OFF: one trigger = all scenarios at once">?</span>
+                        </label>
+                    </div>
+                    <div id="passive-pipeline-${t.id}" class="step-list" style="min-height: 50px; display: flex; flex-direction: column; gap: 6px;"></div>
                 `;
-                list.appendChild(formGroup);
+                list.appendChild(card);
+                
+                // Render pipeline scenarios
+                renderPassivePipeline(t.id);
             });
         }
-
-        function updatePassiveTrigger(triggerId, scenarioVal) {
-            if (scenarioVal === "") {
-                delete configData.passive[triggerId];
-            } else {
-                configData.passive[triggerId] = scenarioVal;
+        
+        function renderPassivePipeline(triggerId) {
+            const container = document.getElementById(`passive-pipeline-${triggerId}`);
+            if (!container) return;
+            
+            const triggerConfig = configData.passive[triggerId];
+            if (!triggerConfig || !triggerConfig.pipeline) return;
+            
+            container.innerHTML = '';
+            
+            if (triggerConfig.pipeline.length === 0) {
+                container.innerHTML = `<div style="color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 8px; border: 1px dashed var(--border); border-radius: 4px;">No scenarios</div>`;
+                return;
+            }
+            
+            triggerConfig.pipeline.forEach((scenarioName, idx) => {
+                const div = document.createElement('div');
+                div.style.display = 'grid';
+                div.style.gridTemplateColumns = '1fr auto';
+                div.style.gap = '6px';
+                div.style.alignItems = 'center';
+                div.style.padding = '6px 8px';
+                div.style.background = 'var(--bg-main)';
+                div.style.borderRadius = '4px';
+                div.style.border = '1px solid var(--border)';
+                div.innerHTML = `
+                    <select onchange="updatePassivePipelineScenario('${triggerId}', ${idx}, this.value)">
+                        ${getScenariosOptions(scenarioName)}
+                    </select>
+                    <button class="step-delete-btn" onclick="deletePassivePipelineScenario('${triggerId}', ${idx})" style="font-size: 1rem;">&times;</button>
+                `;
+                container.appendChild(div);
+            });
+            
+            // Make sortable
+            new Sortable(container, {
+                animation: 150,
+                onEnd: function() {
+                    savePassivePipelineOrder(triggerId, container);
+                }
+            });
+        }
+        
+        function addPassivePipelineScenario(triggerId) {
+            if (!configData.passive[triggerId]) {
+                configData.passive[triggerId] = { pipeline: [], loop: false };
+            }
+            const firstScenario = Object.keys(configData.scenarios)[0] || "";
+            configData.passive[triggerId].pipeline.push(firstScenario);
+            renderPassivePipeline(triggerId);
+        }
+        
+        function updatePassivePipelineScenario(triggerId, idx, scenarioName) {
+            if (configData.passive[triggerId] && configData.passive[triggerId].pipeline) {
+                configData.passive[triggerId].pipeline[idx] = scenarioName;
+            }
+        }
+        
+        function deletePassivePipelineScenario(triggerId, idx) {
+            if (configData.passive[triggerId] && configData.passive[triggerId].pipeline) {
+                configData.passive[triggerId].pipeline.splice(idx, 1);
+                renderPassivePipeline(triggerId);
+            }
+        }
+        
+        function updatePassiveLoop(triggerId, loopValue) {
+            if (!configData.passive[triggerId]) {
+                configData.passive[triggerId] = { pipeline: [], loop: false };
+            }
+            configData.passive[triggerId].loop = loopValue;
+            // Re-render to update Add button state
+            renderPassiveTriggers();
+        }
+        
+        function savePassivePipelineOrder(triggerId, container) {
+            const items = Array.from(container.children);
+            const newOrder = items.map(item => {
+                const select = item.querySelector('select');
+                return select ? select.value : '';
+            }).filter(v => v !== '');
+            
+            if (configData.passive[triggerId]) {
+                configData.passive[triggerId].pipeline = newOrder;
             }
         }
 
@@ -1394,9 +2168,434 @@
             }).join('');
         }
 
+        // ═══════════════════════════════════════════════════════════════
+        // OUTPUTS CONFIGURATION
+        // ═══════════════════════════════════════════════════════════════
+
+        function renderOutputsConfig() {
+            const container = document.getElementById('outputs-config-container');
+            if (!container) return;
+            if (!configData || !configData.outputs) return;
+
+            container.innerHTML = '';
+
+            // Ensure outputs object exists
+            if (!configData.outputs) {
+                configData.outputs = {};
+            }
+
+            // HID Output (always present)
+            if (!configData.outputs.hid) {
+                configData.outputs.hid = {
+                    type: 'hid',
+                    enabled: true,
+                    usb_layout: 'us'
+                };
+            }
+            renderHidOutput();
+
+            // GPIO Outputs
+            Object.entries(configData.outputs)
+                .filter(([key, val]) => val.type === 'gpio')
+                .forEach(([key, output]) => {
+                    renderGpioOutput(key, output);
+                });
+        }
+
+        function renderHidOutput() {
+            const container = document.getElementById('outputs-config-container');
+            if (!container) return;
+            if (!configData || !configData.outputs || !configData.outputs.hid) return;
+            
+            const cfg = configData.outputs.hid;
+
+            const card = document.createElement('div');
+            card.className = 'output-card';
+            card.innerHTML = `
+                <div class="output-card-header">
+                    <span>🎹 USB HID Keyboard</span>
+                    <span class="output-type-badge badge-hid">HID</span>
+                </div>
+                <p class="output-description">Sends keystrokes to the connected host over USB. Acts as a physical keyboard.</p>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="output-hid-enabled" ${cfg.enabled ? 'checked' : ''}
+                        onchange="updateOutputField('hid', 'enabled', this.checked)">
+                    <label for="output-hid-enabled" style="display: flex; align-items: center;">
+                        Enabled
+                        <span class="tooltip-icon" data-tip="If disabled, all HID keyboard output is suppressed">?</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label for="output-hid-layout" style="display: flex; align-items: center;">
+                        Keyboard Layout
+                        <span class="tooltip-icon" data-tip="Key mapping used when sending keystrokes. Match this to your OS keyboard language setting">?</span>
+                    </label>
+                    <select id="output-hid-layout" onchange="updateOutputField('hid', 'usb_layout', this.value)">
+                        <option value="us" selected>US (English)</option>
+                    </select>
+                </div>
+            `;
+            container.appendChild(card);
+        }
+
+        function renderGpioOutput(name, cfg) {
+            const container = document.getElementById('outputs-config-container');
+            if (!container) return;
+            if (!configData || !cfg) return;
+
+            const card = document.createElement('div');
+            card.className = 'output-card';
+            card.innerHTML = `
+                <div class="output-card-header">
+                    <span>🔌 <span class="output-name-display">${name}</span></span>
+                    <span class="output-type-badge badge-gpio">GPIO</span>
+                </div>
+                <p class="output-description">Controls a physical GPIO pin on the Pico. Used to trigger hardware like optocouplers or relays.</p>
+                <div class="checkbox-group">
+                    <input type="checkbox" ${cfg.enabled ? 'checked' : ''}
+                        onchange="updateOutputField('${name}', 'enabled', this.checked)">
+                    <label style="display: flex; align-items: center;">
+                        Enabled
+                        <span class="tooltip-icon" data-tip="If disabled, this output will not fire even if triggered">?</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center;">
+                        GPIO Pin
+                        <span class="tooltip-icon" data-tip="Physical pin number on the Pico board (BCM numbering). Check your wiring diagram">?</span>
+                    </label>
+                    <input type="number" value="${cfg.pin}" min="0" max="28"
+                        onchange="updateOutputField('${name}', 'pin', parseInt(this.value))">
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" ${cfg.active_high ? 'checked' : ''}
+                        onchange="updateOutputField('${name}', 'active_high', this.checked)">
+                    <label>Active High</label>
+                </div>
+                <div class="form-group">
+                    <label>Label (description)</label>
+                    <input type="text" value="${cfg.label || ''}" placeholder="e.g., Server Power Button"
+                        onchange="updateOutputField('${name}', 'label', this.value)">
+                </div>
+                
+                <!-- Default Scenario Section -->
+                <div style="margin-top: 8px; padding: 8px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; display: flex; align-items: center;">
+                        Default Scenario
+                        <span class="tooltip-icon" data-tip="Auto-generated scenario for this output. Use it in pipelines to trigger this GPIO">?</span>
+                    </div>
+                    ${cfg.default_scenario && configData.scenarios[cfg.default_scenario] ? `
+                        <div style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 6px; cursor: pointer;"
+                             onclick="scrollToScenario('${cfg.default_scenario}')">
+                            🔗 ${cfg.default_scenario}
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">→ click to view</span>
+                        </div>
+                    ` : `
+                        <button class="btn btn-sm btn-primary" onclick="createDefaultScenario('${name}')" style="font-size: 0.8rem; padding: 4px 10px;">
+                            + Create default scenario
+                        </button>
+                        ${cfg.default_scenario ? `<div style="font-size: 0.7rem; color: var(--accent-red); margin-top: 4px;">⚠️ Scenario "${cfg.default_scenario}" not found</div>` : ''}
+                    `}
+                </div>
+                
+                <!-- Auto-Boot subsection -->
+                <div style="margin-top: 16px; padding: 12px; background: var(--bg-main); border: 1px solid var(--border); border-radius: 6px; ${!cfg.enabled ? 'opacity: 0.5;' : ''}">
+                    <div style="font-weight: 500; margin-bottom: 8px; font-size: 0.9rem; color: var(--text-muted);">⚙️ Auto-Boot</div>
+                    ${renderAutoBootSubsection(name, cfg)}
+                </div>
+                
+                <button class="btn btn-danger btn-sm" onclick="deleteGpioOutput('${name}')" style="width:100%; margin-top: 12px;">
+                    🗑️ Delete Output
+                </button>
+            `;
+            container.appendChild(card);
+        }
+
+        function addGpioOutput() {
+            if (!configData || !configData.outputs || !configData.scenarios) return;
+            
+            const name = prompt('Enter output name (lowercase, underscores allowed):\ne.g., opto_relay, power_btn');
+            if (!name) return;
+
+            // Validate name
+            if (!/^[a-z0-9_]+$/.test(name)) {
+                alert('❌ Invalid name! Use only lowercase letters, numbers, and underscores.');
+                return;
+            }
+
+            if (configData.outputs[name]) {
+                alert('❌ Output with this name already exists!');
+                return;
+            }
+
+            // Create default scenario name
+            const defaultScenarioName = `scenario_${name}_pulse`;
+
+            // Create GPIO output with default_scenario
+            configData.outputs[name] = {
+                type: 'gpio',
+                enabled: true,
+                pin: 17,
+                active_high: true,
+                label: 'New GPIO Output',
+                default_scenario: defaultScenarioName
+            };
+
+            // Create default scenario automatically (no _auto flag needed - computed dynamically)
+            if (!configData.scenarios[defaultScenarioName]) {
+                configData.scenarios[defaultScenarioName] = [
+                    {output: name, action: "gpio_pulse"}
+                ];
+            }
+
+            renderOutputsConfig();
+            renderScenariosList();
+        }
+
+        function deleteGpioOutput(name) {
+            if (!configData || !configData.outputs || !configData.scenarios) return;
+            
+            const output = configData.outputs[name];
+            const defaultScenario = output?.default_scenario;
+            
+            let confirmMsg = `Delete GPIO output "${name}"?\n\nThis will remove it from scenarios that use it.`;
+            
+            if (defaultScenario && configData.scenarios[defaultScenario]) {
+                confirmMsg += `\n\n⚠️ The linked default scenario "${defaultScenario}" will also be deleted.`;
+            }
+            
+            if (!confirm(confirmMsg)) {
+                return;
+            }
+
+            // Delete the output
+            delete configData.outputs[name];
+            
+            // Delete the default scenario if it exists
+            if (defaultScenario && configData.scenarios[defaultScenario]) {
+                delete configData.scenarios[defaultScenario];
+            }
+            
+            renderOutputsConfig();
+            renderScenariosList();
+        }
+
+        function createDefaultScenario(outputName) {
+            if (!configData || !configData.outputs || !configData.scenarios) return;
+            
+            const output = configData.outputs[outputName];
+            if (!output) return;
+            
+            // Generate default scenario name
+            const scenarioName = `scenario_${outputName}_pulse`;
+            
+            // Create scenario with default gpio_pulse action
+            configData.scenarios[scenarioName] = [
+                { output: outputName, action: "gpio_pulse" }
+            ];
+            
+            // Update output's default_scenario field
+            output.default_scenario = scenarioName;
+            
+            // Re-render UI
+            renderOutputsConfig();
+            renderScenariosList();
+            
+            // Optionally scroll to the new scenario
+            setTimeout(() => scrollToScenario(scenarioName), 100);
+        }
+
+        function updateOutputField(outputName, field, value) {
+            if (!configData || !configData.outputs || !configData.outputs[outputName]) return;
+            configData.outputs[outputName][field] = value;
+            
+            // If enabled flag changed on GPIO output → re-render outputs
+            if (field === 'enabled' && configData.outputs[outputName].type === 'gpio') {
+                renderOutputsConfig();
+            }
+        }
+
+        /**
+         * Serialize all Outputs Configuration fields from DOM to configData
+         * Called when switching away from tab that contains outputs sidebar
+         */
+        function serializeOutputsToConfig() {
+            if (!configData || !configData.outputs) return;
+
+            // HID Output
+            const hidEnabled = document.getElementById('output-hid-enabled');
+            const hidLayout = document.getElementById('output-hid-layout');
+            
+            if (hidEnabled && configData.outputs.hid) {
+                configData.outputs.hid.enabled = hidEnabled.checked;
+            }
+            if (hidLayout && configData.outputs.hid) {
+                configData.outputs.hid.usb_layout = hidLayout.value;
+            }
+
+            // GPIO Outputs - iterate through all GPIO outputs in configData
+            Object.entries(configData.outputs)
+                .filter(([key, val]) => val.type === 'gpio')
+                .forEach(([outputName, outputCfg]) => {
+                    // Find the output card in DOM
+                    const outputCards = document.querySelectorAll('.output-card');
+                    
+                    outputCards.forEach(card => {
+                        const nameDisplay = card.querySelector('.output-name-display');
+                        if (nameDisplay && nameDisplay.textContent === outputName) {
+                            // Read enabled checkbox
+                            const enabledCheckbox = card.querySelector('input[type="checkbox"]:not([type="checkbox"][onchange*="active_high"]):not([onchange*="auto_boot"])');
+                            if (enabledCheckbox) {
+                                outputCfg.enabled = enabledCheckbox.checked;
+                            }
+
+                            // Read GPIO pin
+                            const pinInput = card.querySelector('input[type="number"][onchange*="pin"]');
+                            if (pinInput) {
+                                outputCfg.pin = parseInt(pinInput.value) || 0;
+                            }
+
+                            // Read active_high checkbox
+                            const activeHighCheckbox = card.querySelector('input[type="checkbox"][onchange*="active_high"]');
+                            if (activeHighCheckbox) {
+                                outputCfg.active_high = activeHighCheckbox.checked;
+                            }
+
+                            // Read label field
+                            const labelInput = card.querySelector('input[type="text"][placeholder*="Server"]');
+                            if (labelInput) {
+                                outputCfg.label = labelInput.value;
+                            }
+
+                            // Read Auto-Boot settings
+                            if (outputCfg.auto_boot) {
+                                const autoBootEnabled = card.querySelector('input[type="checkbox"][onchange*="auto_boot"][onchange*="enabled"]');
+                                if (autoBootEnabled) {
+                                    outputCfg.auto_boot.enabled = autoBootEnabled.checked;
+                                }
+
+                                const checkInterval = card.querySelector('input[type="number"][onchange*="check_interval_s"]');
+                                if (checkInterval) {
+                                    outputCfg.auto_boot.check_interval_s = parseInt(checkInterval.value) || 15;
+                                }
+
+                                const maxAttempts = card.querySelector('input[type="number"][onchange*="max_attempts"]');
+                                if (maxAttempts) {
+                                    outputCfg.auto_boot.max_attempts = parseInt(maxAttempts) || 2;
+                                }
+
+                                const retryCooldown = card.querySelector('input[type="number"][onchange*="retry_cooldown_min"]');
+                                if (retryCooldown) {
+                                    outputCfg.auto_boot.retry_cooldown_min = parseInt(retryCooldown.value) || 5;
+                                }
+                            }
+                        }
+                    });
+                });
+
+            console.log('✓ Outputs configuration serialized to configData');
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // AUTO-BOOT SUBSECTION (inside GPIO outputs)
+        // ═══════════════════════════════════════════════════════════════
+
+        function renderAutoBootSubsection(outputName, outputCfg) {
+            // Ensure auto_boot exists
+            if (!outputCfg.auto_boot) {
+                outputCfg.auto_boot = {
+                    enabled: false,
+                    check_interval_s: 15,
+                    max_attempts: 2,
+                    retry_cooldown_min: 5
+                };
+            }
+
+            const autoCfg = outputCfg.auto_boot;
+            const parentDisabled = !outputCfg.enabled;
+            const checkInterval = autoCfg.check_interval_s || 15;
+            const maxAttempts = autoCfg.max_attempts || 2;
+            const totalWait = checkInterval * maxAttempts;
+            
+            const disabledStyle = parentDisabled ? 'pointer-events: none; opacity: 0.6;' : '';
+            const warningHtml = parentDisabled ? `
+                <div style="font-size: 0.75rem; color: var(--accent-orange); background: rgba(255, 145, 0, 0.1); border: 1px solid rgba(255, 145, 0, 0.2); padding: 6px; border-radius: 6px; margin-bottom: 8px;">
+                    ⚠️ Parent output is disabled
+                </div>
+            ` : '';
+            
+            return `
+                ${warningHtml}
+                <div style="${disabledStyle}">
+                    <div class="checkbox-group" style="margin-bottom: 8px;">
+                        <input type="checkbox" ${autoCfg.enabled ? 'checked' : ''} ${parentDisabled ? 'disabled' : ''}
+                            onchange="updateAutoBootField('${outputName}', 'enabled', this.checked)">
+                        <label style="font-size: 0.85rem; display: flex; align-items: center;">
+                            Enable Auto-Boot on this output
+                            <span class="tooltip-icon" data-tip="Automatically fires this GPIO on startup if USB host is not detected">?</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <label style="font-size: 0.85rem; display: flex; align-items: center;">
+                            Check Interval (seconds)
+                            <span class="tooltip-icon" data-tip="Seconds between each USB detection check during boot sequence">?</span>
+                        </label>
+                        <input type="number" value="${checkInterval}" min="5" max="60"
+                            style="font-size: 0.85rem; padding: 4px;"
+                            onchange="updateAutoBootField('${outputName}', 'check_interval_s', parseInt(this.value))">
+                        <small style="color: var(--text-muted); font-size: 0.7rem;">Time between attempts</small>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <label style="font-size: 0.85rem; display: flex; align-items: center;">
+                            Max Attempts
+                            <span class="tooltip-icon" data-tip="Number of failed checks before auto-boot fires the GPIO">?</span>
+                        </label>
+                        <input type="number" value="${maxAttempts}" min="1" max="10"
+                            style="font-size: 0.85rem; padding: 4px;"
+                            onchange="updateAutoBootField('${outputName}', 'max_attempts', parseInt(this.value))">
+                        <small style="color: var(--text-muted); font-size: 0.7rem;">Total wait: ${totalWait}s</small>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 8px;">
+                        <label style="font-size: 0.85rem; display: flex; align-items: center;">
+                            Retry Cooldown (minutes)
+                            <span class="tooltip-icon" data-tip="Minutes to wait before running the auto-boot sequence again after it completes">?</span>
+                        </label>
+                        <input type="number" value="${autoCfg.retry_cooldown_min || 5}" min="1" max="60"
+                            style="font-size: 0.85rem; padding: 4px;"
+                            onchange="updateAutoBootField('${outputName}', 'retry_cooldown_min', parseInt(this.value))">
+                        <small style="color: var(--text-muted); font-size: 0.7rem;">Pause between cycles</small>
+                    </div>
+                    
+                    <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.4; margin-top: 8px; padding: 8px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;">
+                        <b style="color: var(--text-main);">Action:</b> gpio_pulse on GP${outputCfg.pin || '?'} (250ms)<br>
+                        <b style="color: var(--text-main);">Total wait:</b> ${checkInterval}s × ${maxAttempts} = ${totalWait}s
+                    </div>
+                </div>
+            `;
+        }
+
+        function updateAutoBootField(outputName, field, value) {
+            if (!configData.outputs[outputName]) return;
+            if (!configData.outputs[outputName].auto_boot) {
+                configData.outputs[outputName].auto_boot = {};
+            }
+            configData.outputs[outputName].auto_boot[field] = value;
+            renderOutputsConfig();
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // END NEW SECTIONS
+        // ═══════════════════════════════════════════════════════════════
+
         // Render recursive Active Menu tree
         function renderMenuTree() {
             const container = document.getElementById('menu-tree');
+            if (!container) return;
+            if (!configData || !configData.active_menu) return;
+            
             container.innerHTML = '';
 
             configData.active_menu.forEach(item => {
@@ -1557,7 +2756,7 @@
                 label: type === 'folder' ? 'New Folder' : 'New Action Item'
             };
             if (type === 'folder') childItem.submenu = [];
-            else childItem.sequence = [];
+            else childItem.pipeline = [];
 
             const newNode = createTreeItemNode(childItem);
             node.parentNode.insertBefore(newNode, node.nextSibling);
@@ -1576,7 +2775,7 @@
                 label: type === 'folder' ? 'New Folder' : 'New Action Item'
             };
             if (type === 'folder') childItem.submenu = [];
-            else childItem.sequence = [];
+            else childItem.pipeline = [];
 
             // Add to data structure FIRST
             if (!item.submenu) item.submenu = [];
@@ -1638,11 +2837,24 @@
                 const sublistEl = el.querySelector('.tree-item-sublist');
                 if (!sublistEl.classList.contains('invisible')) {
                     item.submenu = serializeMenuTree(sublistEl);
-                    if (sourceItem && sourceItem.sequence) {
-                        item.sequence = sourceItem.sequence;
+                    // Save pipeline and loop if exists
+                    if (sourceItem) {
+                        if (sourceItem.pipeline) item.pipeline = sourceItem.pipeline;
+                        if (sourceItem.loop !== undefined) item.loop = sourceItem.loop;
+                        // Backward compatibility
+                        if (sourceItem.sequence) item.sequence = sourceItem.sequence;
                     }
                 } else {
-                    item.sequence = (sourceItem && sourceItem.sequence) || [];
+                    // Action item - save pipeline and loop
+                    if (sourceItem) {
+                        item.pipeline = sourceItem.pipeline || [];
+                        item.loop = sourceItem.loop !== undefined ? sourceItem.loop : false;
+                        // Backward compatibility
+                        if (sourceItem.sequence) item.sequence = sourceItem.sequence;
+                    } else {
+                        item.pipeline = [];
+                        item.loop = false;
+                    }
                 }
                 list.push(item);
             }
@@ -1671,7 +2883,7 @@
             if (type === 'folder') {
                 newItem.submenu = [];
             } else {
-                newItem.sequence = [];
+                newItem.pipeline = [];
             }
             configData.active_menu.push(newItem);
             renderMenuTree();
@@ -1712,6 +2924,32 @@
             document.getElementById('inspect-type-action').checked = !isFolder;
             document.getElementById('inspect-type-folder').checked = isFolder;
 
+            // Update label tooltip based on type
+            const labelTooltip = document.getElementById('inspect-label-tooltip');
+            const labelText = document.getElementById('inspect-label-text');
+            const loopTooltip = document.getElementById('inspect-loop-tooltip');
+            const pipelineTooltip = document.getElementById('inspect-pipeline-tooltip');
+            
+            if (isFolder) {
+                labelTooltip.setAttribute('data-tip', 'Group name shown in the HID menu navigation');
+                if (labelText) labelText.textContent = 'Folder name';
+                if (loopTooltip) {
+                    loopTooltip.setAttribute('data-tip', 'ON: each enter into folder cycles through items. OFF: opens folder normally');
+                }
+                if (pipelineTooltip) {
+                    pipelineTooltip.setAttribute('data-tip', 'Scenarios that run when entering this folder');
+                }
+            } else {
+                labelTooltip.setAttribute('data-tip', 'Text shown on screen for this action');
+                if (labelText) labelText.textContent = 'Action label';
+                if (loopTooltip) {
+                    loopTooltip.setAttribute('data-tip', 'ON: each press = next scenario in order. OFF: all scenarios fire at once');
+                }
+                if (pipelineTooltip) {
+                    pipelineTooltip.setAttribute('data-tip', 'Scenarios that run when this action is triggered');
+                }
+            }
+
             const folderActionsPanel = document.getElementById('inspect-folder-actions-panel');
             if (isFolder) {
                 folderActionsPanel.classList.remove('invisible');
@@ -1719,9 +2957,11 @@
                 folderActionsPanel.classList.add('invisible');
             }
 
-            // Show hint for folders with sequence
+            // Show hint - check both pipeline and sequence (backward compatibility)
             const sequenceHint = document.getElementById('inspect-sequence-hint');
-            if (isFolder && currentItem.sequence && currentItem.sequence.length > 0) {
+            const hasPipeline = (currentItem.pipeline && currentItem.pipeline.length > 0) ||
+                               (currentItem.sequence && currentItem.sequence.length > 0);
+            if (hasPipeline) {
                 sequenceHint.style.display = 'block';
             } else {
                 sequenceHint.style.display = 'none';
@@ -1874,6 +3114,26 @@
                 folderActionsPanel.classList.remove('invisible');
                 titleBadge.className = 'item-badge badge-folder';
                 titleBadge.textContent = 'FOLDER';
+                
+                // Update label tooltip for folder
+                const labelTooltip = document.getElementById('inspect-label-tooltip');
+                const labelText = document.getElementById('inspect-label-text');
+                const loopTooltip = document.getElementById('inspect-loop-tooltip');
+                const pipelineTooltip = document.getElementById('inspect-pipeline-tooltip');
+                
+                if (labelTooltip) {
+                    labelTooltip.setAttribute('data-tip', 'Group name shown in the HID menu navigation');
+                }
+                if (labelText) {
+                    labelText.textContent = 'Folder name';
+                }
+                if (loopTooltip) {
+                    loopTooltip.setAttribute('data-tip', 'ON: each enter into folder cycles through items. OFF: opens folder normally');
+                }
+                if (pipelineTooltip) {
+                    pipelineTooltip.setAttribute('data-tip', 'Scenarios that run when entering this folder');
+                }
+                
                 initSortableOnList(sublistNode);
             } else {
                 if ('submenu' in item) {
@@ -1887,6 +3147,25 @@
                 folderActionsPanel.classList.add('invisible');
                 titleBadge.className = 'item-badge badge-action';
                 titleBadge.textContent = 'ACTION';
+                
+                // Update label tooltip for action
+                const labelTooltip = document.getElementById('inspect-label-tooltip');
+                const labelText = document.getElementById('inspect-label-text');
+                const loopTooltip = document.getElementById('inspect-loop-tooltip');
+                const pipelineTooltip = document.getElementById('inspect-pipeline-tooltip');
+                
+                if (labelTooltip) {
+                    labelTooltip.setAttribute('data-tip', 'Text shown on screen for this action');
+                }
+                if (labelText) {
+                    labelText.textContent = 'Action label';
+                }
+                if (loopTooltip) {
+                    loopTooltip.setAttribute('data-tip', 'ON: each press = next scenario in order. OFF: all scenarios fire at once');
+                }
+                if (pipelineTooltip) {
+                    pipelineTooltip.setAttribute('data-tip', 'Scenarios that run when this action is triggered');
+                }
             }
 
             saveAndSyncMenu();
@@ -1896,48 +3175,94 @@
         // Edit sequence of action / folder
         function renderInspectorSequence() {
             const list = document.getElementById('inspect-sequence-list');
+            if (!list) return;
+            if (!configData || !selectedItemRef) return;
+            
             list.innerHTML = '';
 
             const item = selectedItemRef.item;
-            if (!item.sequence) {
-                item.sequence = [];
+            
+            // Convert old sequence to new pipeline format
+            if (item.sequence && !item.pipeline) {
+                item.pipeline = item.sequence.map(entry => {
+                    if (typeof entry === 'string') return entry;
+                    return entry.scenario || '';
+                }).filter(s => s !== '');
+                item.loop = true; // sequence was always cyclic
+                delete item.sequence;
+            }
+            
+            // Ensure pipeline exists
+            if (!item.pipeline) {
+                item.pipeline = [];
+            }
+            if (item.loop === undefined) {
+                item.loop = false;
+            }
+            
+            // Update loop checkbox
+            const loopCheckbox = document.getElementById('inspect-loop-mode');
+            if (loopCheckbox) {
+                loopCheckbox.checked = item.loop;
             }
 
-            // Update hint visibility for folders
-            const isFolder = 'submenu' in item;
+            // Update "Add scenario" button state based on loop and pipeline length
+            const addButton = document.querySelector('#inspector-edit-panel button[onclick="addPipelineEntry()"]');
+            if (addButton) {
+                // If loop: false and pipeline has at least one scenario → disable Add button
+                const shouldDisable = !item.loop && item.pipeline.length > 0;
+                addButton.disabled = shouldDisable;
+                addButton.style.opacity = shouldDisable ? '0.5' : '1';
+                addButton.style.cursor = shouldDisable ? 'not-allowed' : 'pointer';
+                addButton.title = shouldDisable ? 'Cannot add more scenarios when Loop is OFF (only one scenario allowed)' : '';
+            }
+
+            // Update hint visibility
             const sequenceHint = document.getElementById('inspect-sequence-hint');
-            if (isFolder && item.sequence.length > 0) {
+            if (item.pipeline.length > 0) {
                 sequenceHint.style.display = 'block';
             } else {
                 sequenceHint.style.display = 'none';
             }
 
-            if (item.sequence.length === 0) {
-                list.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:6px;">No scenarios bound</div>`;
+            if (item.pipeline.length === 0) {
+                list.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:6px;">No scenarios in pipeline</div>`;
                 return;
             }
 
-            item.sequence.forEach((entry, idx) => {
-                const scenarioName = typeof entry === 'string' ? entry : (entry.scenario || "");
-                const displayName = typeof entry === 'string' ? entry : (entry.name || scenarioName);
-
+            item.pipeline.forEach((entry, idx) => {
+                // Backward compatibility: support both string and object format
+                const scenarioName = typeof entry === 'string' ? entry : entry.scenario;
+                const label = typeof entry === 'object' ? (entry.label || '') : '';
+                
                 const div = document.createElement('div');
                 div.style.display = 'grid';
                 div.style.gridTemplateColumns = '1fr 1fr auto';
                 div.style.gap = '8px';
                 div.style.alignItems = 'center';
                 div.innerHTML = `
-                    <select onchange="updateSequenceEntryScenario(${idx}, this.value)" onkeydown="if(event.key==='Enter') this.blur();">
+                    <select onchange="updatePipelineEntry(${idx}, 'scenario', this.value)" onkeydown="if(event.key==='Enter') this.blur();">
                         ${getScenariosOptions(scenarioName)}
                     </select>
-                    <input type="text" value="${escapeHtml(displayName)}" placeholder="Display Name" onchange="updateSequenceEntryName(${idx}, this.value)" onkeydown="if(event.key==='Enter') { updateSequenceEntryName(${idx}, this.value); this.blur(); }">
-                    <button class="step-delete-btn" onclick="deleteSequenceEntry(${idx})">&times;</button>
+                    <input type="text" placeholder="Label..." value="${escapeHtml(label)}" 
+                           onblur="updatePipelineEntry(${idx}, 'label', this.value)"
+                           onkeydown="if(event.key==='Enter') { updatePipelineEntry(${idx}, 'label', this.value); this.blur(); }"
+                           style="font-size: 0.85rem;">
+                    <button class="step-delete-btn" onclick="deletePipelineEntry(${idx})">&times;</button>
                 `;
                 list.appendChild(div);
             });
+            
+            // Make sortable
+            new Sortable(list, {
+                animation: 150,
+                onEnd: function() {
+                    savePipelineOrder(list);
+                }
+            });
         }
 
-        function addSequenceEntry() {
+        function addPipelineEntry() {
             if (!selectedItemRef) return;
             const item = selectedItemRef.item;
 
@@ -1946,38 +3271,63 @@
                 configData.scenarios[firstScenario] = [];
             }
 
-            if (!item.sequence) item.sequence = [];
-            item.sequence.push({ scenario: firstScenario, name: "Run" });
+            if (!item.pipeline) item.pipeline = [];
+            item.pipeline.push({ scenario: firstScenario, label: '' });
             renderInspectorSequence();
             saveAndSyncMenu();
             renderPassiveTriggers();
         }
 
-        function updateSequenceEntryScenario(idx, scenarioVal) {
-            const entry = selectedItemRef.item.sequence[idx];
-            if (typeof entry === 'string') {
-                selectedItemRef.item.sequence[idx] = scenarioVal;
-            } else {
-                entry.scenario = scenarioVal;
+        function updatePipelineEntry(idx, field, value) {
+            if (!selectedItemRef) return;
+            const item = selectedItemRef.item.pipeline[idx];
+            
+            // Convert to object format if still string
+            if (typeof item === 'string') {
+                selectedItemRef.item.pipeline[idx] = { scenario: item, label: '' };
             }
+            
+            // Update field
+            if (field === 'scenario') {
+                selectedItemRef.item.pipeline[idx].scenario = value;
+            } else if (field === 'label') {
+                selectedItemRef.item.pipeline[idx].label = value;
+            }
+            
             saveAndSyncMenu();
         }
 
-        function updateSequenceEntryName(idx, nameVal) {
-            const entry = selectedItemRef.item.sequence[idx];
-            if (typeof entry === 'string') {
-                selectedItemRef.item.sequence[idx] = { scenario: entry, name: nameVal };
-            } else {
-                entry.name = nameVal;
-            }
-            saveAndSyncMenu();
-        }
-
-        function deleteSequenceEntry(idx) {
-            selectedItemRef.item.sequence.splice(idx, 1);
+        function deletePipelineEntry(idx) {
+            if (!selectedItemRef) return;
+            selectedItemRef.item.pipeline.splice(idx, 1);
             renderInspectorSequence();
             saveAndSyncMenu();
         }
+        
+        function updateInspectedItemLoop(loopValue) {
+            if (!selectedItemRef) return;
+            selectedItemRef.item.loop = loopValue;
+            renderInspectorSequence(); // refresh hint
+            saveAndSyncMenu();
+        }
+        
+        function savePipelineOrder(container) {
+            if (!selectedItemRef) return;
+            const items = Array.from(container.children);
+            const newOrder = items.map(item => {
+                const select = item.querySelector('select');
+                return select ? select.value : '';
+            }).filter(v => v !== '');
+            
+            selectedItemRef.item.pipeline = newOrder;
+            saveAndSyncMenu();
+        }
+        
+        // Backward compatibility: keep old function names as aliases
+        function addSequenceEntry() { addPipelineEntry(); }
+        function updateSequenceEntryScenario(idx, val) { updatePipelineEntry(idx, val); }
+        function updateSequenceEntryName(idx, val) { /* deprecated */ }
+        function deleteSequenceEntry(idx) { deletePipelineEntry(idx); }
 
         function deleteInspectedItem() {
             if (!selectedItemRef) return;
@@ -2003,19 +3353,32 @@
 
         function renderScenariosList() {
             const list = document.getElementById('scenarios-list');
+            if (!list) return;
+            if (!configData || !configData.scenarios) return;
+            
             list.innerHTML = '';
 
             Object.keys(configData.scenarios).forEach(name => {
                 if (scenarioFilterQuery && !name.toLowerCase().includes(scenarioFilterQuery)) {
                     return;
                 }
+                
+                // Check if auto-generated dynamically (linked to GPIO output)
+                const isAutoGenerated = isAutoScenario(name);
+                const scenarioSteps = configData.scenarios[name];
+                const stepsCount = Array.isArray(scenarioSteps) ? scenarioSteps.length : 0;
+                const isEmpty = stepsCount === 0;
 
                 const btn = document.createElement('button');
                 btn.className = `scenario-option ${name === activeScenarioName ? 'active' : ''}`;
                 btn.dataset.name = name; // Store name in DOM for safety
                 btn.innerHTML = `
-                    <span>${escapeHtml(name)}</span>
-                    <span style="font-size:0.75rem; color:var(--text-muted)">(${configData.scenarios[name].length})</span>
+                    <span style="display: flex; align-items: center; gap: 6px;">
+                        ${isAutoGenerated ? '<span style="font-size: 0.7rem; color: var(--text-muted); background: rgba(139, 146, 182, 0.15); padding: 2px 5px; border-radius: 3px; border: 1px solid rgba(139, 146, 182, 0.2);">AUTO</span>' : ''}
+                        ${isEmpty ? '<span style="font-size: 0.7rem; color: var(--accent-red); background: rgba(255, 51, 102, 0.15); padding: 2px 5px; border-radius: 3px; border: 1px solid rgba(255, 51, 102, 0.3);">EMPTY</span>' : ''}
+                        <span>${escapeHtml(name)}</span>
+                    </span>
+                    <span style="font-size:0.75rem; color:var(--text-muted)">(${stepsCount})</span>
                 `;
                 btn.onclick = function() {
                     // Read name from DOM dataset instead of closure
@@ -2038,6 +3401,33 @@
             activeScenarioName = name;
             renderScenariosList();
             updateScenarioEditor();
+        }
+        
+        function scrollToScenario(scenarioName) {
+            if (!configData || !configData.scenarios) return;
+            
+            // Check if scenario exists
+            if (!configData.scenarios[scenarioName]) {
+                console.warn(`Scenario "${scenarioName}" does not exist`);
+                return;
+            }
+            
+            // Switch to Scenarios tab
+            switchTab('tab-scenarios');
+            
+            // Select the scenario
+            selectScenario(scenarioName);
+            
+            // Scroll the scenario into view in the list
+            setTimeout(() => {
+                const scenariosList = document.getElementById('scenarios-list');
+                const scenarioButton = Array.from(scenariosList.children).find(
+                    btn => btn.dataset.name === scenarioName
+                );
+                if (scenarioButton) {
+                    scenarioButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 100);
         }
 
         function showScenarioContextMenu(e, scenarioName) {
@@ -2113,23 +3503,46 @@
                 return;
             }
 
-            // Copy scenario data
+            // Copy scenario data (no _auto flag to preserve - computed dynamically)
             configData.scenarios[sanitized] = configData.scenarios[oldName];
             delete configData.scenarios[oldName];
 
             // Update references in passive triggers
             Object.keys(configData.passive).forEach(key => {
-                if (configData.passive[key] === oldName) {
+                const trigger = configData.passive[key];
+                // New format: pipeline
+                if (trigger && trigger.pipeline) {
+                    trigger.pipeline = trigger.pipeline.map(s => s === oldName ? sanitized : s);
+                }
+                // Old format: string
+                else if (trigger === oldName) {
                     configData.passive[key] = sanitized;
                 }
             });
 
-            // Update references in menu sequences
+            // Update references in GPIO outputs default_scenario
+            if (configData.outputs) {
+                Object.values(configData.outputs).forEach(output => {
+                    if (output.type === 'gpio' && output.default_scenario === oldName) {
+                        output.default_scenario = sanitized;
+                    }
+                });
+            }
+            renderOutputsConfig(); // Re-render outputs UI to show updated default_scenario
+
+            // Update references in menu pipelines
             function updateRefs(items) {
                 items.forEach(item => {
+                    // New format: pipeline
+                    if (item.pipeline) {
+                        item.pipeline = item.pipeline.map(s => s === oldName ? sanitized : s);
+                    }
+                    // Old format: sequence
                     if (item.sequence) {
                         item.sequence.forEach(step => {
-                            if (step.scenario === oldName) {
+                            if (typeof step === 'string' && step === oldName) {
+                                step = sanitized;
+                            } else if (step.scenario === oldName) {
                                 step.scenario = sanitized;
                             }
                         });
@@ -2160,7 +3573,7 @@
                 counter++;
             }
 
-            // Deep copy the scenario steps
+            // Deep copy the scenario steps (no _auto flag to remove - computed dynamically)
             configData.scenarios[copyName] = JSON.parse(JSON.stringify(configData.scenarios[scenarioName]));
 
             activeScenarioName = copyName;
@@ -2175,18 +3588,44 @@
 
             delete configData.scenarios[scenarioName];
 
+            // Clear references in GPIO outputs default_scenario
+            if (configData.outputs) {
+                Object.values(configData.outputs).forEach(output => {
+                    if (output.type === 'gpio' && output.default_scenario === scenarioName) {
+                        delete output.default_scenario;
+                    }
+                });
+            }
+
             // Clear references in passive triggers
             Object.keys(configData.passive).forEach(key => {
-                if (configData.passive[key] === scenarioName) {
+                const trigger = configData.passive[key];
+                // New format: pipeline
+                if (trigger && trigger.pipeline) {
+                    trigger.pipeline = trigger.pipeline.filter(s => s !== scenarioName);
+                    if (trigger.pipeline.length === 0) {
+                        delete configData.passive[key];
+                    }
+                }
+                // Old format: string
+                else if (trigger === scenarioName) {
                     delete configData.passive[key];
                 }
             });
 
-            // Clear references in menu sequences
+            // Clear references in menu pipelines
             function clearRefs(items) {
                 items.forEach(item => {
+                    // New format: pipeline
+                    if (item.pipeline) {
+                        item.pipeline = item.pipeline.filter(s => s !== scenarioName);
+                    }
+                    // Old format: sequence
                     if (item.sequence) {
-                        item.sequence = item.sequence.filter(step => step.scenario !== scenarioName);
+                        item.sequence = item.sequence.filter(step => {
+                            if (typeof step === 'string') return step !== scenarioName;
+                            return step.scenario !== scenarioName;
+                        });
                     }
                     if (item.submenu) clearRefs(item.submenu);
                 });
@@ -2201,23 +3640,156 @@
 
             renderScenariosList();
             renderPassiveTriggers();
+            renderOutputsConfig(); // Re-render GPIO outputs to show "Create" button if default_scenario was deleted
             if (selectedItemRef) renderInspectorSequence();
         }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Contextual Toolbox System
+        // ═══════════════════════════════════════════════════════════════
+        
+        /**
+         * Checks if a scenario is auto-generated (linked as default_scenario to a GPIO output).
+         * Computed dynamically - no storage needed.
+         */
+        function isAutoScenario(scenarioName) {
+            if (!configData || !configData.outputs || !scenarioName) return false;
+            return Object.values(configData.outputs).some(
+                output => output.type === 'gpio' && output.default_scenario === scenarioName
+            );
+        }
+
+        /**
+         * Determines the output type of a scenario based on:
+         * 1. If it's a default_scenario for a GPIO output → 'gpio'
+         * 2. First step with output field → type of that output
+         * 3. Otherwise → 'mixed' (undefined)
+         */
+        function getScenarioOutputType(scenarioName) {
+            if (!configData || !configData.outputs || !configData.scenarios) return 'mixed';
+            if (!scenarioName || !configData.scenarios[scenarioName]) {
+                return 'mixed';
+            }
+            
+            // Check if this scenario is a default_scenario for any GPIO output
+            for (const [outputName, outputCfg] of Object.entries(configData.outputs)) {
+                if (outputCfg.type === 'gpio' && outputCfg.default_scenario === scenarioName) {
+                    return 'gpio';
+                }
+            }
+            
+            // Check first step with output field
+            const steps = configData.scenarios[scenarioName];
+            for (const step of steps) {
+                if (step.output && configData.outputs[step.output]) {
+                    return configData.outputs[step.output].type;
+                }
+            }
+            
+            return 'mixed';
+        }
+        
+        /**
+         * Returns available step types based on output type
+         */
+        function getAvailableStepTypes(outputType) {
+            const stepTypes = {
+                hid: [
+                    { type: 'type', label: 'Type text', hidAction: true, tooltip: 'Sends a keystroke or key combination to the host. Example: ctrl+alt+t' },
+                    { type: 'key', label: 'KeyPress combo', hidAction: true, tooltip: 'Sends a keystroke or key combination to the host. Example: ctrl+alt+t' },
+                    { type: 'enter', label: 'Press Enter', hidAction: true, tooltip: 'Sends the Enter/Return key to the host' },
+                    { type: 'wait', label: 'Wait MS', hidAction: false, tooltip: 'Pauses the pipeline for a specified duration in milliseconds' }
+                ],
+                gpio: [
+                    { type: 'gpio_pulse', label: 'GPIO Pulse', hidAction: false, tooltip: 'Sends a short pulse to the GPIO pin (default 250ms). Used for momentary triggers like power buttons' },
+                    { type: 'gpio_hold', label: 'GPIO Hold', hidAction: false, tooltip: 'Holds the GPIO pin HIGH for a custom duration in milliseconds' },
+                    { type: 'gpio_toggle', label: 'GPIO Toggle', hidAction: false, tooltip: 'Flips the GPIO pin state: HIGH→LOW or LOW→HIGH' }
+                    // Note: No 'wait' - GPIO actions are atomic with timing as parameters
+                ],
+                mixed: [
+                    { type: 'type', label: 'Type text', hidAction: true, tooltip: 'Sends a keystroke or key combination to the host. Example: ctrl+alt+t' },
+                    { type: 'key', label: 'KeyPress combo', hidAction: true, tooltip: 'Sends a keystroke or key combination to the host. Example: ctrl+alt+t' },
+                    { type: 'enter', label: 'Press Enter', hidAction: true, tooltip: 'Sends the Enter/Return key to the host' },
+                    { type: 'gpio_pulse', label: 'GPIO Pulse', hidAction: false, tooltip: 'Sends a short pulse to the GPIO pin (default 250ms). Used for momentary triggers like power buttons' },
+                    { type: 'gpio_hold', label: 'GPIO Hold', hidAction: false, tooltip: 'Holds the GPIO pin HIGH for a custom duration in milliseconds' },
+                    { type: 'gpio_toggle', label: 'GPIO Toggle', hidAction: false, tooltip: 'Flips the GPIO pin state: HIGH→LOW or LOW→HIGH' },
+                    { type: 'wait', label: 'Wait MS', hidAction: false, tooltip: 'Pauses the pipeline for a specified duration in milliseconds' }
+                ]
+            };
+            
+            return stepTypes[outputType] || stepTypes.mixed;
+        }
+        
+        /**
+         * Renders the contextual toolbox based on active scenario output type
+         */
+        function renderContextualToolbox() {
+            const toolboxContainer = document.querySelector('.toolbox-steps');
+            if (!toolboxContainer) return;
+            if (!configData || !configData.scenarios) return;
+            
+            const outputType = getScenarioOutputType(activeScenarioName);
+            const availableSteps = getAvailableStepTypes(outputType);
+            
+            let warningHtml = '';
+            if (outputType === 'mixed') {
+                warningHtml = `
+                    <div style="grid-column: 1 / -1; font-size: 0.75rem; color: var(--accent-orange); 
+                                background: rgba(255, 145, 0, 0.1); border: 1px solid rgba(255, 145, 0, 0.2); 
+                                padding: 8px; border-radius: 6px; margin-bottom: 8px;">
+                        ⚠️ Output type not determined. Add a step with output to enable filtering.
+                    </div>
+                `;
+            }
+            
+            const stepsHtml = availableSteps.map(step => {
+                const tooltipHtml = step.tooltip 
+                    ? `<span class="tooltip-icon" data-tip="${step.tooltip}">?</span>` 
+                    : '';
+                return `<div class="tool-btn" data-type="${step.type}" draggable="true" 
+                             ondragstart="handleStepDragStart(event)" 
+                             onclick="handleToolboxClick('${step.type}')"
+                             style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                            <span>${step.label}</span>${tooltipHtml}
+                        </div>`;
+            }).join('');
+            
+            toolboxContainer.innerHTML = warningHtml + stepsHtml;
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // Scenario Editor
+        // ═══════════════════════════════════════════════════════════════
 
         function updateScenarioEditor() {
             const empty = document.getElementById('scenario-empty');
             const stepsContainer = document.getElementById('scenario-steps-container');
             const title = document.getElementById('current-scenario-title');
+            const modal = document.getElementById('empty-scenario-modal');
 
             if (!activeScenarioName) {
                 empty.classList.remove('invisible');
                 stepsContainer.classList.add('invisible');
                 title.textContent = 'Select scenario...';
+                modal.classList.remove('active');
                 return;
             }
 
-            empty.classList.add('invisible');
-            stepsContainer.classList.remove('invisible');
+            // Check if scenario is empty
+            const scenarioSteps = configData.scenarios[activeScenarioName];
+            const isEmpty = !scenarioSteps || scenarioSteps.length === 0;
+
+            if (isEmpty) {
+                // Show modal for empty scenarios
+                showEmptyScenarioModal();
+                empty.classList.add('invisible');
+                stepsContainer.classList.remove('invisible');
+            } else {
+                // Hide modal for non-empty scenarios
+                modal.classList.remove('active');
+                empty.classList.add('invisible');
+                stepsContainer.classList.remove('invisible');
+            }
 
             // Make title editable - use onblur instead of onchange for better UX
             const escapedName = activeScenarioName.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -2228,7 +3800,97 @@
                 onblur="renameActiveScenario(this.value)"
                 onkeydown="if(event.key==='Enter') this.blur();" />`;
 
+            // Render contextual toolbox based on scenario output type
+            renderContextualToolbox();
+            
             renderScenarioSteps();
+        }
+
+        function showEmptyScenarioModal() {
+            const modal = document.getElementById('empty-scenario-modal');
+            const select = document.getElementById('modal-output-select');
+            
+            if (!configData || !configData.outputs) return;
+            
+            // Build options list from enabled outputs
+            let optionsHtml = '<option value="">-- Select output --</option>';
+            
+            // Add HID if enabled
+            if (configData.outputs.hid && configData.outputs.hid.enabled) {
+                optionsHtml += '<option value="hid">HID (Keyboard/Mouse)</option>';
+            }
+            
+            // Add all enabled GPIO outputs
+            Object.keys(configData.outputs).forEach(outputName => {
+                const output = configData.outputs[outputName];
+                if (output.type === 'gpio' && output.enabled) {
+                    const label = output.label || outputName;
+                    optionsHtml += `<option value="${outputName}">GPIO: ${label} (${outputName})</option>`;
+                }
+            });
+            
+            select.innerHTML = optionsHtml;
+            modal.classList.add('active');
+        }
+
+        function confirmOutputSelection() {
+            const select = document.getElementById('modal-output-select');
+            const selectedOutput = select.value;
+            
+            if (!selectedOutput) {
+                alert('Please select an output type');
+                return;
+            }
+            
+            // Create first step based on selected output
+            if (!configData.scenarios[activeScenarioName]) {
+                configData.scenarios[activeScenarioName] = [];
+            }
+            
+            let firstStep;
+            if (selectedOutput === 'hid') {
+                // Create default HID step (type text)
+                firstStep = { output: 'hid', action: 'type', value: '' };
+            } else {
+                // Create default GPIO step (pulse)
+                firstStep = { output: selectedOutput, action: 'gpio_pulse' };
+            }
+            
+            configData.scenarios[activeScenarioName].push(firstStep);
+            
+            // Close modal and refresh UI
+            document.getElementById('empty-scenario-modal').classList.remove('active');
+            renderScenarioSteps();
+            renderContextualToolbox();
+            renderScenariosList(); // Update badge (remove EMPTY)
+        }
+
+        function closeEmptyScenarioModal(event) {
+            // If event is provided, check if it's a backdrop click
+            if (event && event.target.id !== 'empty-scenario-modal') {
+                return; // Click was inside modal content, don't close
+            }
+            
+            const modal = document.getElementById('empty-scenario-modal');
+            
+            // Delete the empty scenario
+            if (activeScenarioName && configData.scenarios[activeScenarioName]) {
+                const scenario = configData.scenarios[activeScenarioName];
+                if (!scenario || scenario.length === 0) {
+                    // Scenario is empty, delete it
+                    delete configData.scenarios[activeScenarioName];
+                    activeScenarioName = null;
+                    
+                    // Update UI
+                    modal.classList.remove('active');
+                    renderScenariosList();
+                    updateScenarioEditor(); // Clear the editor
+                    return;
+                }
+            }
+            
+            // Just close modal if scenario is not empty (shouldn't happen)
+            modal.classList.remove('active');
         }
 
         function addNewScenario() {
@@ -2273,23 +3935,46 @@
                 return;
             }
 
-            // Rename: copy data to new key and delete old key
+            // Rename: copy data to new key and delete old key (no _auto flag to preserve - computed dynamically)
             configData.scenarios[sanitized] = configData.scenarios[activeScenarioName];
             delete configData.scenarios[activeScenarioName];
 
             // Update passive triggers that reference the old name
             Object.keys(configData.passive).forEach(key => {
-                if (configData.passive[key] === activeScenarioName) {
+                const trigger = configData.passive[key];
+                // New format: pipeline
+                if (trigger && trigger.pipeline) {
+                    trigger.pipeline = trigger.pipeline.map(s => s === activeScenarioName ? sanitized : s);
+                }
+                // Old format: string
+                else if (trigger === activeScenarioName) {
                     configData.passive[key] = sanitized;
                 }
             });
 
-            // Update menu items that reference the old name in their sequences
+            // Update GPIO outputs default_scenario that reference the old name
+            if (configData.outputs) {
+                Object.values(configData.outputs).forEach(output => {
+                    if (output.type === 'gpio' && output.default_scenario === activeScenarioName) {
+                        output.default_scenario = sanitized;
+                    }
+                });
+            }
+            renderOutputsConfig(); // Re-render outputs UI to show updated default_scenario
+
+            // Update menu items that reference the old name in their pipelines
             function updateSequenceRefs(menuItems) {
                 menuItems.forEach(item => {
+                    // New format: pipeline
+                    if (item.pipeline) {
+                        item.pipeline = item.pipeline.map(s => s === activeScenarioName ? sanitized : s);
+                    }
+                    // Old format: sequence
                     if (item.sequence) {
                         item.sequence.forEach(step => {
-                            if (step.type === 'scenario' && step.scenario === activeScenarioName) {
+                            if (typeof step === 'string' && step === activeScenarioName) {
+                                step = sanitized;
+                            } else if (step.scenario === activeScenarioName) {
                                 step.scenario = sanitized;
                             }
                         });
@@ -2315,19 +4000,34 @@
             if (!confirm(`Are you sure you want to delete scenario: ${activeScenarioName}?`)) return;
 
             delete configData.scenarios[activeScenarioName];
+            
+            // Clear references in GPIO outputs default_scenario
+            if (configData.outputs) {
+                Object.values(configData.outputs).forEach(output => {
+                    if (output.type === 'gpio' && output.default_scenario === activeScenarioName) {
+                        delete output.default_scenario;
+                    }
+                });
+            }
+            
             activeScenarioName = null;
 
             renderScenariosList();
             updateScenarioEditor();
             renderPassiveTriggers();
+            renderOutputsConfig(); // Re-render GPIO outputs to show "Create" button if default_scenario was deleted
             if (selectedItemRef) renderInspectorSequence();
         }
 
         function renderScenarioSteps() {
             const container = document.getElementById('scenario-steps-list');
+            if (!container) return;
+            if (!configData || !configData.scenarios || !activeScenarioName) return;
+            
             container.innerHTML = '';
 
-            const steps = configData.scenarios[activeScenarioName] || [];
+            const scenarioData = configData.scenarios[activeScenarioName];
+            const steps = Array.isArray(scenarioData) ? scenarioData : [];
 
             if (steps.length === 0) {
                 container.innerHTML = `<div class="empty-placeholder" style="padding: 2rem; border-style:dashed;">Click or drag steps here to build sequence</div>`;
@@ -2352,20 +4052,73 @@
             card.dataset.idx = idx;
             card.tabIndex = 0; // Make card focusable
 
+            // Determine step action (handle "wait" special case)
+            const stepAction = step.wait !== undefined ? 'wait' : step.action;
+
             // Create step type label
             const typeDiv = document.createElement('div');
-            typeDiv.className = `step-type type-${step.action}`;
-            typeDiv.textContent = step.action;
+            typeDiv.className = `step-type type-${stepAction}`;
+            typeDiv.textContent = stepAction;
 
             // Create fields container
             const fieldsDiv = document.createElement('div');
             fieldsDiv.className = 'step-fields';
 
-            // Create input field based on step type
-            if (step.action === 'type') {
+            // ═══ OUTPUT SELECTOR (READ-ONLY - AUTO-DETERMINED FROM SCENARIO CONTEXT) ═══
+            // Skip output selector for "wait" action (no output needed)
+            if (stepAction !== 'wait') {
+                const outputGroup = document.createElement('div');
+                outputGroup.className = 'form-group';
+                outputGroup.style.minWidth = '140px';
+
+                const outputLabel = document.createElement('label');
+                outputLabel.textContent = 'Output';
+                outputLabel.style.fontSize = '0.7rem';
+                outputLabel.style.marginBottom = '2px';
+                outputLabel.style.color = 'var(--text-muted)';
+
+                // Determine linked output from scenario context
+                const scenarioOutputType = getScenarioOutputType(activeScenarioName);
+                let linkedOutput = step.output || 'hid';
+                
+                // If scenario is linked to a GPIO output, find that output name
+                if (scenarioOutputType === 'gpio' && configData.outputs) {
+                    for (const [outputName, outputCfg] of Object.entries(configData.outputs)) {
+                        if (outputCfg.type === 'gpio' && outputCfg.default_scenario === activeScenarioName) {
+                            linkedOutput = outputName;
+                            break;
+                        }
+                    }
+                }
+
+                // Display output as read-only text label
+                const outputDisplay = document.createElement('div');
+                outputDisplay.style.fontSize = '0.85rem';
+                outputDisplay.style.padding = '8px 12px';
+                outputDisplay.style.background = 'var(--bg-main)';
+                outputDisplay.style.border = '1px solid var(--border)';
+                outputDisplay.style.borderRadius = '6px';
+                outputDisplay.style.color = 'var(--accent-cyan)';
+                outputDisplay.style.fontFamily = 'var(--font-mono)';
+                outputDisplay.style.fontWeight = '600';
+                outputDisplay.textContent = linkedOutput;
+                outputDisplay.title = 'Output is auto-determined from scenario context (linked output)';
+
+                outputGroup.appendChild(outputLabel);
+                outputGroup.appendChild(outputDisplay);
+                fieldsDiv.appendChild(outputGroup);
+            }
+
+            // ═══ FIELDS BASED ON STEP TYPE ═══
+            if (stepAction === 'type') {
                 const formGroup = document.createElement('div');
                 formGroup.className = 'form-group';
                 formGroup.style.flex = '1';
+
+                const label = document.createElement('label');
+                label.textContent = 'Text';
+                label.style.fontSize = '0.7rem';
+                label.style.marginBottom = '2px';
 
                 const input = document.createElement('input');
                 input.type = 'text';
@@ -2379,12 +4132,19 @@
                     }
                 };
 
+                formGroup.appendChild(label);
                 formGroup.appendChild(input);
                 fieldsDiv.appendChild(formGroup);
-            } else if (step.action === 'key') {
+            } 
+            else if (stepAction === 'key') {
                 const formGroup = document.createElement('div');
                 formGroup.className = 'form-group';
                 formGroup.style.flex = '1';
+
+                const label = document.createElement('label');
+                label.textContent = 'Combo';
+                label.style.fontSize = '0.7rem';
+                label.style.marginBottom = '2px';
 
                 const input = document.createElement('input');
                 input.type = 'text';
@@ -2398,31 +4158,19 @@
                     }
                 };
 
+                formGroup.appendChild(label);
                 formGroup.appendChild(input);
                 fieldsDiv.appendChild(formGroup);
-            } else if (step.action === 'wait') {
+            } 
+            else if (stepAction === 'enter') {
                 const formGroup = document.createElement('div');
                 formGroup.className = 'form-group';
                 formGroup.style.flex = '1';
 
-                const input = document.createElement('input');
-                input.type = 'number';
-                input.value = step.ms || 0;
-                input.placeholder = 'milliseconds';
-                input.oninput = function() { updateStepValue(idx, 'ms', parseInt(this.value)); };
-                input.onkeydown = function(event) {
-                    if(event.key === 'Enter') {
-                        updateStepValue(idx, 'ms', parseInt(this.value));
-                        this.blur();
-                    }
-                };
-
-                formGroup.appendChild(input);
-                fieldsDiv.appendChild(formGroup);
-            } else if (step.action === 'enter') {
-                const formGroup = document.createElement('div');
-                formGroup.className = 'form-group';
-                formGroup.style.flex = '1';
+                const label = document.createElement('label');
+                label.textContent = 'Count';
+                label.style.fontSize = '0.7rem';
+                label.style.marginBottom = '2px';
 
                 const input = document.createElement('input');
                 input.type = 'number';
@@ -2436,8 +4184,80 @@
                     }
                 };
 
+                formGroup.appendChild(label);
                 formGroup.appendChild(input);
                 fieldsDiv.appendChild(formGroup);
+            }
+            else if (stepAction === 'wait') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const label = document.createElement('label');
+                label.textContent = 'Milliseconds';
+                label.style.fontSize = '0.7rem';
+                label.style.marginBottom = '2px';
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.value = step.wait || 0;
+                input.placeholder = 'milliseconds';
+                input.oninput = function() { updateStepValue(idx, 'wait', parseInt(this.value)); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'wait', parseInt(this.value));
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(label);
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            }
+            // ═══ GPIO ACTIONS ═══
+            else if (stepAction === 'gpio_pulse') {
+                // GPIO pulse has no extra fields - just the output selector
+                const info = document.createElement('div');
+                info.style.fontSize = '0.75rem';
+                info.style.color = 'var(--text-muted)';
+                info.style.fontStyle = 'italic';
+                info.textContent = 'Sends 250ms pulse to GPIO pin';
+                fieldsDiv.appendChild(info);
+            }
+            else if (stepAction === 'gpio_hold') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const label = document.createElement('label');
+                label.textContent = 'Duration (ms)';
+                label.style.fontSize = '0.7rem';
+                label.style.marginBottom = '2px';
+
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.value = step.duration_ms || 1000;
+                input.placeholder = 'milliseconds';
+                input.oninput = function() { updateStepValue(idx, 'duration_ms', parseInt(this.value)); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'duration_ms', parseInt(this.value));
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(label);
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            }
+            else if (stepAction === 'gpio_toggle') {
+                // GPIO toggle has no extra fields
+                const info = document.createElement('div');
+                info.style.fontSize = '0.75rem';
+                info.style.color = 'var(--text-muted)';
+                info.style.fontStyle = 'italic';
+                info.textContent = 'Toggles GPIO pin state';
+                fieldsDiv.appendChild(info);
             }
 
             // Create delete button
@@ -2483,28 +4303,61 @@
             if (!draggedStepType || !activeScenarioName) return;
             e.preventDefault();
 
-            let newStep = { action: draggedStepType };
-            if (draggedStepType === 'type') newStep.value = '';
-            else if (draggedStepType === 'key') newStep.combo = '';
-            else if (draggedStepType === 'wait') newStep.ms = 500;
-            else if (draggedStepType === 'enter') newStep.count = 1;
-
-            configData.scenarios[activeScenarioName].push(newStep);
+            // Use the same logic as handleToolboxClick
+            handleToolboxClick(draggedStepType);
             draggedStepType = null;
-            renderScenarioSteps();
         });
 
         function handleToolboxClick(type) {
             if (!activeScenarioName) return;
+            if (!configData || !configData.scenarios || !configData.outputs) return;
+            
+            // Validate step type compatibility
+            const outputType = getScenarioOutputType(activeScenarioName);
+            const availableSteps = getAvailableStepTypes(outputType);
+            const isAllowed = availableSteps.some(step => step.type === type);
+            
+            if (!isAllowed && outputType !== 'mixed') {
+                alert(`❌ Incompatible step type "${type}" for ${outputType} output!\n\nThis scenario is linked to a ${outputType.toUpperCase()} output and can only use ${outputType}-compatible steps.`);
+                return;
+            }
 
-            let newStep = { action: type };
-            if (type === 'type') newStep.value = '';
-            else if (type === 'key') newStep.combo = '';
-            else if (type === 'wait') newStep.ms = 500;
-            else if (type === 'enter') newStep.count = 1;
+            let newStep = {};
+            
+            // HID actions
+            if (type === 'type') {
+                newStep = { output: 'hid', action: type, value: '' };
+            } else if (type === 'key') {
+                newStep = { output: 'hid', action: type, combo: '' };
+            } else if (type === 'enter') {
+                newStep = { output: 'hid', action: type, count: 1 };
+            }
+            // GPIO actions
+            else if (type === 'gpio_pulse') {
+                // Find first gpio output or use default
+                const gpioOutput = Object.keys(configData.outputs).find(name => 
+                    configData.outputs[name].type === 'gpio'
+                ) || 'gpio_out';
+                newStep = { output: gpioOutput, action: type };
+            } else if (type === 'gpio_hold') {
+                const gpioOutput = Object.keys(configData.outputs).find(name => 
+                    configData.outputs[name].type === 'gpio'
+                ) || 'gpio_out';
+                newStep = { output: gpioOutput, action: type, duration_ms: 1000 };
+            } else if (type === 'gpio_toggle') {
+                const gpioOutput = Object.keys(configData.outputs).find(name => 
+                    configData.outputs[name].type === 'gpio'
+                ) || 'gpio_out';
+                newStep = { output: gpioOutput, action: type };
+            }
+            // Wait (universal)
+            else if (type === 'wait') {
+                newStep = { wait: 500 };
+            }
 
             configData.scenarios[activeScenarioName].push(newStep);
             renderScenarioSteps();
+            renderContextualToolbox(); // Re-render toolbox as type might have changed
         }
 
         function deleteStep(idx) {
@@ -2550,6 +4403,8 @@
             }
 
             configData.scenarios[activeScenarioName] = reordered;
+            // No need to preserve _auto flag - computed dynamically via isAutoScenario()
+
             renderScenarioSteps();
             renderScenariosList();
         }
@@ -2563,6 +4418,38 @@
                 .replace(/"/g, "&quot;")
                 .replace(/'/g, "&#039;");
         }
+
+        // Global tooltip handler
+        document.addEventListener('mouseover', function(e) {
+            const icon = e.target.closest('.tooltip-icon');
+            const tip = document.getElementById('global-tooltip');
+            if (icon && icon.dataset.tip) {
+                const rect = icon.getBoundingClientRect();
+                const isLeftTooltip = icon.classList.contains('tooltip-icon--left');
+                
+                tip.textContent = icon.dataset.tip;
+                tip.style.display = 'block';
+                
+                // Position vertically centered with icon
+                tip.style.top = (rect.top + rect.height / 2 - tip.offsetHeight / 2) + 'px';
+                
+                // Position horizontally based on tooltip direction
+                if (isLeftTooltip) {
+                    tip.style.left = (rect.left - tip.offsetWidth - 10) + 'px';
+                } else {
+                    tip.style.left = (rect.right + 10) + 'px';
+                }
+            }
+        });
+
+        document.addEventListener('mouseout', function(e) {
+            if (e.target.closest('.tooltip-icon')) {
+                document.getElementById('global-tooltip').style.display = 'none';
+            }
+        });
     </script>
+
+    <!-- Global tooltip container -->
+    <div id="global-tooltip"></div>
 </body>
 </html>
