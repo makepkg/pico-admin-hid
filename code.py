@@ -258,6 +258,7 @@ auto_boot_output_name = None
 check_interval = 15  # default, переопределяется из config
 max_attempts = 2     # default, переопределяется из config
 retry_cooldown_min = 5
+boot_grace_end = time.monotonic() + 60
 
 outputs_cfg = config.get_config().get("outputs", {})
 
@@ -363,7 +364,7 @@ while True:
 
     # --- Auto-Boot циклическая проверка ---
     try:
-        if auto_boot_enabled and not auto_boot_in_progress and now >= auto_boot_next_check:
+        if auto_boot_enabled and not auto_boot_in_progress and now >= auto_boot_next_check and not inputs.auto_boot_blocked and now <= boot_grace_end:
             # Проверяем USB ДО начала цикла
             usb_state = supervisor.runtime.usb_connected
             

@@ -7,7 +7,31 @@ and this project uses Semantic Versioning-like numbering.
 
 ---
 
-## [Unreleased] — Input/Output Architecture Rewrite
+## [1.1.0] — Power Monitor State Machine Refactor
+
+### Changed
+
+- `PowerMonitorInput` rewritten as state machine: `MONITORING → TRIGGERED → SUSPENDED → SUSPENDED_WAITING`
+- Removed fields `cooldown_sec` and `cancel_cooldown_sec`
+- Added fields `recovery_offset_percent`, `trigger_attempts`, `trigger_attempt_interval_sec`
+- USB-gating: shutdown trigger fires only when USB is connected (server is running)
+- Auto-boot blocked (`blocks_auto_boot`) while system is in SUSPENDED state
+- Auto-boot limited to 60-second grace period after Pico startup
+- Pico starting with low battery % and no USB connection now starts directly in SUSPENDED state
+
+### Added
+
+- State transition logging to `/power_monitor.log` with 20KB rotation
+- Initial state detection in `__init__` — determines startup state based on actual metrics
+
+### Migration
+
+- Remove `cooldown_sec` and `cancel_cooldown_sec` from `config.json`
+- Add `recovery_offset_percent: 10`, `trigger_attempts: 3`, `trigger_attempt_interval_sec: 60`
+
+---
+
+## [1.0.0] — Input/Output Architecture Rewrite
 
 Major architectural refactoring to support extensible typed inputs and outputs with unified pipeline execution engine.
 

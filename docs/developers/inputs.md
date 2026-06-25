@@ -59,16 +59,22 @@ The power monitor uses the `INA226Monitor` wrapper to read voltage and current o
 - `threshold_percent` / `threshold_voltage`: The critical threshold where the trigger fires.
 - `warning_offset_percent`: Adds an offset (e.g., +5%) to the threshold. When the battery enters this zone, a warning screen is displayed, but the trigger does not fire yet.
 - `read_interval_sec`: Throttles I2C reads (e.g., only poll the sensor every 5 seconds).
-- `cooldown_sec`: The cooldown applied after the trigger fires.
-- `cancel_cooldown_sec`: The cooldown applied if the user manually cancels the warning.
+- `recovery_offset_percent`: Additional % above threshold required before resuming normal monitoring after recovery. Prevents re-triggering immediately after the battery recovers.
+- `trigger_attempts`: Maximum number of shutdown attempts before entering SUSPENDED state.
+- `trigger_attempt_interval_sec`: Seconds between retry attempts when the server does not shut down.
 
-**States and Dismissal**:
-- `warning_active`: The battery is in the warning zone.
-- `triggered`: The critical threshold was breached, and the trigger fired.
-- `trigger_canceled`: The user clicked the encoder center button. The trigger is aborted, and the long `cancel_cooldown_sec` is applied.
-- `warning_dismissed`: The user scrolled the encoder. The warning overlay is hidden, but the trigger **remains armed** without a cooldown. If the battery drops to the critical threshold, it will still fire.
+**State Machine**:
 
-*Note: Dismissals and cancellations are reset only when the battery charges back above the warning threshold.*
+`PowerMonitorInput` uses a four-state machine:
+
+- `MONITORING`: Normal operation. If battery % drops to or below `threshold_percent` and USB is connected, transitions to TRIGGERED.
+- `TRIGGERED`: Shutdown sequence active. Fires trigger on the bus, retries up to `trigger_attempts` times. If USB disconnects (server shut down) → SUSPENDED. If max attempts reached → SUSPENDED.
+- `SUSPENDED`: Shutdown complete or max attempts exhausted. Auto-boot is blocked (`blocks_auto_boot = True`). Waits for USB to reconnect.
+- `SUSPENDED_WAITING`: USB reconnected, waiting for battery to recover above `threshold_percent + recovery_offset_percent` before returning to MONITORING.
+
+**USB Gate**: The trigger fires only if USB is connected (`usb=True`). If the server is already off, no trigger is sent.
+
+**Boot behaviour**: On Pico startup, if battery % is already below threshold and USB is absent, the system starts directly in SUSPENDED — preventing auto-boot from attempting to start the server on a low battery.
 
 **Priority**: Always uses `trigger_bus.PRIORITY_HIGH`.
 

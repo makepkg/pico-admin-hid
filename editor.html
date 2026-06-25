@@ -1670,8 +1670,9 @@
                         threshold_percent: oldCfg.threshold_percent !== undefined ? oldCfg.threshold_percent : 15,
                         threshold_voltage: oldCfg.threshold_voltage !== undefined ? oldCfg.threshold_voltage : 16.5,
                         warning_offset_percent: oldCfg.warning_offset_percent !== undefined ? oldCfg.warning_offset_percent : 5,
-                        cooldown_sec: oldCfg.cooldown_sec !== undefined ? oldCfg.cooldown_sec : 300,
-                        cancel_cooldown_sec: oldCfg.cancel_cooldown_sec !== undefined ? oldCfg.cancel_cooldown_sec : 3600,
+                        recovery_offset_percent: oldCfg.recovery_offset_percent !== undefined ? oldCfg.recovery_offset_percent : 10,
+                        trigger_attempts: oldCfg.trigger_attempts !== undefined ? oldCfg.trigger_attempts : 3,
+                        trigger_attempt_interval_sec: oldCfg.trigger_attempt_interval_sec !== undefined ? oldCfg.trigger_attempt_interval_sec : 60,
                         read_interval_sec: oldCfg.read_interval_sec !== undefined ? oldCfg.read_interval_sec : 5.0,
                         warning_enabled: oldCfg.warning_enabled !== false,
                         warning_blink_interval: oldCfg.warning_blink_interval || 0.5,
@@ -1737,8 +1738,9 @@
                     threshold_percent: 15,
                     threshold_voltage: 16.5,
                     warning_offset_percent: 5,
-                    cooldown_sec: 300,
-                    cancel_cooldown_sec: 3600,
+                    recovery_offset_percent: 10,
+                    trigger_attempts: 3,
+                    trigger_attempt_interval_sec: 60,
                     read_interval_sec: 5.0,
                     warning_enabled: true,
                     warning_blink_interval: 0.5,
@@ -1807,20 +1809,29 @@
 
                     <div class="form-group">
                         <label style="display: flex; align-items: center;">
-                            Cooldown after trigger (sec)
-                            <span class="tooltip-icon" data-tip="Seconds to wait before re-triggering after a shutdown trigger fired">?</span>
+                            Recovery offset (%)
+                            <span class="tooltip-icon" data-tip="Additional % above threshold required before resuming normal monitoring after recovery. Prevents re-triggering immediately after manual boot.">?</span>
                         </label>
-                        <input type="number" value="${cfg.cooldown_sec}" min="0"
-                            onchange="updateInputField('ina226', 'cooldown_sec', parseInt(this.value))">
+                        <input type="number" value="${cfg.recovery_offset_percent}" min="1" max="20"
+                            onchange="updateInputField('ina226', 'recovery_offset_percent', parseInt(this.value))">
                     </div>
 
                     <div class="form-group">
                         <label style="display: flex; align-items: center;">
-                            Cooldown after cancel (sec)
-                            <span class="tooltip-icon" data-tip="Seconds the 'Canceled' state is held after user cancels the warning">?</span>
+                            Trigger attempts
+                            <span class="tooltip-icon" data-tip="Maximum number of shutdown attempts before giving up and entering suspended state.">?</span>
                         </label>
-                        <input type="number" value="${cfg.cancel_cooldown_sec}" min="0"
-                            onchange="updateInputField('ina226', 'cancel_cooldown_sec', parseInt(this.value))">
+                        <input type="number" value="${cfg.trigger_attempts}" min="1" max="10"
+                            onchange="updateInputField('ina226', 'trigger_attempts', parseInt(this.value))">
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Attempt interval (sec)
+                            <span class="tooltip-icon" data-tip="Seconds between retry attempts when server does not shut down.">?</span>
+                        </label>
+                        <input type="number" value="${cfg.trigger_attempt_interval_sec}" min="10" max="300"
+                            onchange="updateInputField('ina226', 'trigger_attempt_interval_sec', parseInt(this.value))">
                     </div>
 
                     <div class="form-group">

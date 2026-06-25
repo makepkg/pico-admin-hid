@@ -152,8 +152,9 @@ Monitors battery voltage/current over I2C and fires a trigger when battery is cr
     "threshold_percent": 15,
     "threshold_voltage": 16.5,
     "warning_offset_percent": 5,
-    "cooldown_sec": 300,
-    "cancel_cooldown_sec": 3600,
+    "recovery_offset_percent": 10,
+    "trigger_attempts": 3,
+    "trigger_attempt_interval_sec": 60,
     "read_interval_sec": 5.0,
     "warning_enabled": true,
     "warning_blink_interval": 0.5,
@@ -169,9 +170,10 @@ Monitors battery voltage/current over I2C and fires a trigger when battery is cr
 ```
 - `type`: Must be `"power_monitor"`.
 - `trigger_mode`: `"percent"` or `"voltage"`.
-- `warning_offset_percent`: Adds this value to the threshold to show a warning *before* triggering. (e.g., if threshold is 15%, warning starts at 20%).
-- `cooldown_sec`: Cooldown applied after the trigger fires.
-- `cancel_cooldown_sec`: Cooldown applied if the user manually cancels the shutdown.
+- `recovery_offset_percent`: Additional % above threshold required before resuming normal monitoring after recovery. Prevents re-triggering immediately after the battery recovers. Default: `10`.
+- `trigger_attempts`: Maximum number of shutdown attempts before the system enters SUSPENDED state and stops retrying. Default: `3`.
+- `trigger_attempt_interval_sec`: Seconds between retry attempts when the server does not respond to shutdown. Default: `60`.
+- `warning_offset_percent`: Adds this value to the threshold to show a warning before triggering (e.g., threshold 15% → warning starts at 20%).
 - `splash_duration_sec`: How long the battery HUD stays on screen during screensaver.
 
 ---
