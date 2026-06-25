@@ -7,7 +7,7 @@ and this project uses Semantic Versioning-like numbering.
 
 ---
 
-## [1.1.0] — Power Monitor State Machine Refactor
+## [2.1.0] — Power Monitor State Machine Refactor
 
 ### Changed
 
@@ -31,7 +31,7 @@ and this project uses Semantic Versioning-like numbering.
 
 ---
 
-## [1.0.0] — Input/Output Architecture Rewrite
+## [2.0.0] — Input/Output Architecture Rewrite
 
 Major architectural refactoring to support extensible typed inputs and outputs with unified pipeline execution engine.
 
