@@ -610,6 +610,8 @@ Comprehensive guides available in the `docs/` directory:
 
 Use `editor.html` for a graphical configuration interface with drag-and-drop menu builder, scenario editor, and validation. See [Config Editor Guide](docs/user/config-editor.md) for complete documentation.
 
+**Remote Access Option:** For server/homelab setups where the Pico is connected to a headless machine, see [`pico-host/`](pico-host/) — a Dockerized web server that provides remote browser access with automatic CIRCUITPY mounting.
+
 ### Manual Configuration
 
 #### Basic Menu Item
@@ -737,6 +739,7 @@ See `scenario_test_opto_pulse` in the included `config.json` for a real example 
 | `splash_trigger.py` | Timer for periodic splash screen display during idle periods |
 | `warning_screen.py` | Low-battery warning overlay with blinking alert and encoder dismiss |
 | `editor.html` | Web-based Config Studio — visual editor for config.json with drag-and-drop |
+| `pico-host/` | Dockerized web server for remote config editing (see [pico-host/README.md](pico-host/)) |
 | `settings.toml.example` | Example CircuitPython settings file for WiFi/environment config |
 | `lib/` | CircuitPython libraries (Adafruit HID, display drivers) |
 
