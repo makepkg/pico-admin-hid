@@ -2,11 +2,13 @@
   "inputs": {
     "hall_sensor_1": {
       "type": "hall",
+      "enabled": true,
       "pin": 15,
       "active_low": true
     },
     "hall_sensor_2": {
       "type": "hall",
+      "enabled": true,
       "pin": 16,
       "active_low": true
     },
@@ -32,6 +34,22 @@
       "i2c_scl": 5,
       "i2c_sda": 4,
       "i2c_address": 64
+    },
+    "trackball_1": {
+      "type": "trackball",
+      "enabled": true,
+      "pin_up": 3,
+      "pin_down": 4,
+      "pin_left": 6,
+      "pin_right": 1,
+      "pin_button": 5,
+      "sensitivity": 20,
+      "debounce_ms": 15,
+      "triple_click_window_ms": 1000,
+      "triple_click_count": 3,
+      "click_mode": "mouse",
+      "triple_click_mode": "mouse",
+      "output": "mouse"
     }
   },
 
@@ -50,7 +68,9 @@
     "cooldown_ms": 5000,
     "armed":       true,
     "screen_timeout_s": 15,
-    "screensaver": "tesseract"
+    "screensaver": "tesseract",
+    "display_enabled": false,
+    "encoder_enabled": false
   },
 
   "outputs": {
@@ -72,6 +92,14 @@
         "max_attempts": 2,
         "retry_cooldown_min": 5
       }
+    },
+    "mouse": {
+      "type": "mouse",
+      "enabled": true
+    },
+    "serial": {
+      "type": "serial",
+      "enabled": true
     }
   },
 
@@ -315,6 +343,11 @@
       {"wait":  200},
       {"output": "hid", "action": "type",  "value": "cd /opt/tududi && docker-compose start"},
       {"output": "hid", "action": "key",   "combo": "enter"}
+    ],
+    "scenario_test_serial": [
+      {"output": "serial", "action": "send_line", "value": "Hello from Pico!"},
+      {"wait": 500},
+      {"output": "serial", "action": "event", "name": "button_pressed", "data": {"button_id": "hall_sensor_1"}}
     ]
   }
 }

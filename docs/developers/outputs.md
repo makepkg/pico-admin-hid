@@ -10,9 +10,11 @@ In the Pico Commander architecture, an **Output** is the final recipient of an a
 
 Each step can specify an `"output"` key matching a name defined in `config["outputs"]`. If omitted, it defaults to `"hid"`. A single output module can serve any number of steps across different scenarios.
 
-Currently, there are two built-in types of outputs:
+Currently, there are four built-in types of outputs:
 1. `hid` — USB HID Keyboard commands (typing, shortcuts).
 2. `gpio` — Digital pin control (relays, optocouplers, LEDs).
+3. `mouse` — USB HID Mouse commands (movement, clicks).
+4. `serial` — Raw or structured events over the second USB CDC (serial data) port, for a listener script on the host.
 
 ---
 
@@ -98,6 +100,71 @@ Upon initialization, and during `cleanup()` or error fallbacks, the pin is set t
 
 ### `default_scenario` Convention
 You might see `default_scenario` in the `config.json` for GPIO outputs. This is **not** used by `output_gpio.py` itself. It is a UI convention used by Config Studio (`editor.html`) to auto-generate a convenient one-step scenario (e.g., `scenario_opto_pwr_pulse`) that can be easily referenced in pipelines or `auto_boot`.
+
+---
+
+## Built-in Output: Mouse (`output_mouse.py`)
+
+USB HID Mouse commands — movement and clicks. Used for a trackball input, but can also be driven from any scenario like any other output.
+
+### Configuration
+```json
+"outputs": {
+  "mouse": {
+    "type": "mouse",
+    "enabled": true
+  }
+}
+```
+
+### Supported Actions
+- `move`: relative movement via `dx`/`dy` pixel offsets.
+- `click`: a full press+release on `button` (`left`/`right`/`middle`, defaults to `left`).
+- `press`: presses `button` and holds it.
+- `release`: releases `button`.
+
+### Lazy Initialization and Safety
+Same pattern as `HidOutput` — the `Mouse` object is created on first `execute()` call, not at `__init__`. If USB is not connected (`supervisor.runtime.usb_connected` is `False`), the action is skipped and logged. `cleanup()` calls `release_all()` to ensure no button is left held down on stop/reload.
+
+### Direct-Call Pattern (Trackball Input)
+Unlike scenario-driven outputs, `TrackballInput` (`inputs_manager.py`) calls `trigger_bus.execute_output("mouse", {...})` directly on every `update(now)` tick for movement, bypassing `fire()`/`fire_active()` entirely. This is intentional: a busy mouse-output call would otherwise block on the continuous movement stream from the same input if it went through the normal cooldown/priority queue. See `docs/developers/inputs.md` for the full explanation of this exception.
+
+---
+
+## Built-in Output: Serial (`output_serial.py`)
+
+Sends events to a listener script on the host over the second USB CDC interface (`usb_cdc.data`), separate from the console/REPL port. This exists because HID typing depends on host focus, keyboard layout, and an application actually being ready to receive keystrokes — Serial is a plain data channel that works regardless of what's on screen on the host.
+
+### Configuration
+```json
+"outputs": {
+  "serial": {
+    "type": "serial",
+    "enabled": true,
+    "label": "Host event channel"
+  }
+}
+```
+
+### Requires `boot.py` Setup
+`usb_cdc.enable(console=True, data=True)` must be called in `boot.py`, before `usb_hid.enable(...)`. This creates a second CDC port (e.g. `/dev/ttyACM1` on Linux) separate from the console port used for logs and REPL. This only takes effect after a full USB replug — a soft-reload of `code.py` alone will not apply a `boot.py` change.
+
+### Supported Actions
+- `send`: writes a raw string with no trailing newline.
+- `send_line`: writes a string followed by `\n`.
+- `event`: writes a JSON object followed by `\n`. Always includes `"event"` (from the step's `name` field) and `"uptime"` (`time.monotonic()`, not wall-clock time — there is no RTC on the Pico). Any fields in the step's `data` object are merged in.
+
+Example scenario:
+```json
+"scenario_notify_poweroff": [
+  {"output": "serial", "action": "event", "name": "poweroff", "data": {"source": "menu"}}
+]
+```
+
+### Safety / Non-Blocking Behavior
+- `write_timeout` is set to `0` — writes never block the main loop, even if the host isn't reading.
+- If the host isn't listening (`usb_cdc.data.connected` is `False`), the step is skipped and logged — same fail-safe pattern as `HidOutput`'s USB-not-connected check.
+- There is no acknowledgment or delivery guarantee. This is a fire-and-forget channel, not a request/response protocol.
 
 ---
 

@@ -213,6 +213,26 @@ When writing `trigger_bus.fire(self.input_id, priority)`, you must choose a prio
 
 ---
 
+## Direct Output Binding (Bypass Pattern)
+
+Some inputs produce continuous, high-frequency signals (rotation, cursor movement) rather than discrete trigger events. For these, routing through `trigger_bus.fire()` is the wrong tool: `fire()` enforces `cooldown_ms` and a `_busy` flag meant to prevent duplicate discrete triggers, and would drop most events from a continuous stream.
+
+**Use this pattern when**: the input produces many events per second and each one should be applied immediately and individually (not queued, not debounced against each other) — e.g. rotary encoders, trackballs, touchpads, joysticks.
+
+**How it works**: the Input's `update(now)` calls `trigger_bus.execute_output(output_name, action)` directly, bypassing `fire()`/`fire_active()`/pipelines entirely. `execute_output()` only checks that the target output exists and is `enabled` — no cooldown, no busy check, no priority queue.
+
+```python
+# Inside an Input's update(now):
+trigger_bus.execute_output(self.output_name, {"action": "move", "dx": dx, "dy": dy})
+```
+
+**Existing examples**:
+
+- **Encoder** (`encoder.py`): rotation/press events go through a `set_callback()` registered in `code.py`, which directly mutates `menu_cursor`/`display` state — no `execute_output()` involved, since the encoder drives UI state, not an output.
+- **Trackball** (`inputs_manager.py`, `TrackballInput`): movement calls `trigger_bus.execute_output("mouse", {...})` directly each `update(now)` tick; button clicks (discrete) also go through `execute_output()` rather than `fire()`, since a busy mouse-output call would otherwise block on the continuous movement stream from the same input.
+
+**When NOT to use this**: for genuinely discrete events (a sensor tripping, a menu click) — those belong in `fire()`/`fire_active()`, so they get cooldown protection and participate in the priority queue as intended.
+
 ## Related Documentation
 
 - [System Architecture](architecture.md)

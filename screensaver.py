@@ -91,10 +91,10 @@ class ScreensaverManager:
         self.bitmap.fill(0)
 
         if self.name == "tesseract":
-            self.angle_xy += self.speed_xy
-            self.angle_xz += self.speed_xz
-            self.angle_xw += self.speed_xw
-            self.angle_yz += self.speed_yz
+            self.angle_xy = (self.angle_xy + self.speed_xy) % (2 * math.pi)
+            self.angle_xz = (self.angle_xz + self.speed_xz) % (2 * math.pi)
+            self.angle_xw = (self.angle_xw + self.speed_xw) % (2 * math.pi)
+            self.angle_yz = (self.angle_yz + self.speed_yz) % (2 * math.pi)
 
             projected = []
             w_distance = 3.0

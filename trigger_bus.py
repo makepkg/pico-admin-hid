@@ -16,6 +16,8 @@ import config as cfg
 # Импорты новых output handlers
 from output_hid import HidOutput
 from output_gpio import GpioOutput
+from output_mouse import MouseOutput
+from output_serial import SerialOutput
 
 PRIORITY_LOW    = 0
 PRIORITY_NORMAL = 1
@@ -42,6 +44,10 @@ class OutputsManager:
                     self._outputs[name] = HidOutput(name, cfg_dict)
                 elif output_type == "gpio":
                     self._outputs[name] = GpioOutput(name, cfg_dict)
+                elif output_type == "mouse":
+                    self._outputs[name] = MouseOutput(name, cfg_dict)
+                elif output_type == "serial":
+                    self._outputs[name] = SerialOutput(name, cfg_dict)
                 else:
                     print(f"[outputs] Unknown type '{output_type}' for output '{name}'")
             except Exception as e:
@@ -275,10 +281,14 @@ def get_next_action_name(item_id):
         if loop_mode:
             positions = state.get("trigger_positions", {})
             pos = positions.get(f"active_{item_id}", 0) % len(pipeline)
-            return pipeline[pos]
+            entry = pipeline[pos]
         else:
             # Для loop=false показываем первый сценарий
-            return pipeline[0]
+            entry = pipeline[0]
+
+        if isinstance(entry, str):
+            return entry
+        return entry.get("label", entry.get("scenario", ""))
     
     # Обратная совместимость: старый sequence
     sequence = item.get("sequence", [])

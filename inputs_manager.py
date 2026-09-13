@@ -7,6 +7,7 @@ inputs_manager.py — унифицированный менеджер входн
 
 import board
 import digitalio
+import countio
 import time
 import trigger_bus
 import config as cfg
@@ -79,6 +80,153 @@ class HallSensorInput:
         raw = self.sensor.value
         return (not raw) if self.active_low else raw
     
+    def _make_input_pullup(self, pin_num):
+        pin = digitalio.DigitalInOut(getattr(board, "GP" + str(pin_num)))
+        pin.direction = digitalio.Direction.INPUT
+        pin.pull = digitalio.Pull.UP
+        return pin
+
+
+class TrackballInput:
+    """Трек-болл: 4 направленных пина, гибридная схема опроса.
+    
+    UP/RIGHT — через countio.Counter (аппаратный счётчик, PWM Channel B,
+    нечётные GPIO). DOWN/LEFT — через digitalio polling в update() (RP2040
+    countio требует PWM Channel B, недоступен на чётных GPIO — физическое
+    ограничение чипа, не выбор реализации). Кнопка — digitalio с debounce.
+    
+    Работает НАПРЯМУЮ через trigger_bus.execute_output(), в обход
+    fire()/cooldown/busy. Не проверяет device.armed (UI-устройство, как энкодер).
+    """
+
+    def __init__(self, input_id, config_dict):
+        self.input_id = input_id
+        self.config = config_dict
+
+        self.output_name = config_dict.get("output", "mouse")
+        self.sensitivity = config_dict.get("sensitivity", 1)
+        self.debounce_ms = config_dict.get("debounce_ms", 15)
+        self.triple_click_window_ms = config_dict.get("triple_click_window_ms", 1000)
+        self.triple_click_count = config_dict.get("triple_click_count", 3)
+        self.click_mode = config_dict.get("click_mode", "mouse")
+        self.triple_click_mode = config_dict.get("triple_click_mode", "mouse")
+
+        pin_up = config_dict.get("pin_up")
+        pin_down = config_dict.get("pin_down")
+        pin_left = config_dict.get("pin_left")
+        pin_right = config_dict.get("pin_right")
+        pin_button = config_dict.get("pin_button")
+
+        missing = [n for n, v in [
+            ("pin_up", pin_up), ("pin_down", pin_down),
+            ("pin_left", pin_left), ("pin_right", pin_right),
+            ("pin_button", pin_button),
+        ] if v is None]
+        if missing:
+            raise ValueError(f"Trackball {input_id}: не указаны пины: {missing}")
+
+        # UP/RIGHT — аппаратный countio.Counter (требует нечётный GPIO, PWM Channel B)
+        self._c_up = countio.Counter(getattr(board, "GP" + str(pin_up)))
+        self._c_right = countio.Counter(getattr(board, "GP" + str(pin_right)))
+
+        # DOWN/LEFT — ручной polling через digitalio (чётные GPIO, PWM Channel A,
+        # countio недоступен — физическое ограничение RP2040)
+        self._pin_down = self._make_input_pullup(pin_down)
+        self._pin_left = self._make_input_pullup(pin_left)
+        self._last_raw_down = self._pin_down.value
+        self._last_raw_left = self._pin_left.value
+
+        self._btn = digitalio.DigitalInOut(getattr(board, "GP" + str(pin_button)))
+        self._btn.direction = digitalio.Direction.INPUT
+        self._btn.pull = digitalio.Pull.UP
+
+        self._last_raw_btn = False
+        self._last_stable_btn = False
+        self._btn_change_t = time.monotonic()
+
+        self._click_count = 0
+        self._first_click_t = 0.0
+
+        self._btn_is_down = False
+
+        print(f"[inputs] Trackball {input_id}: UP=GP{pin_up}(countio) "
+              f"RIGHT=GP{pin_right}(countio) DOWN=GP{pin_down}(poll) "
+              f"LEFT=GP{pin_left}(poll) BTN=GP{pin_button}")
+
+    def update(self, now):
+        up = self._c_up.count
+        self._c_up.count = 0
+        right = self._c_right.count
+        self._c_right.count = 0
+
+        # Ручной edge-detect для DOWN/LEFT: считаем переход HIGH→LOW
+        # (кнопка/контакт трек-болла подтянута к 3V3, замыкание на GND = LOW)
+        down = 0
+        raw_down = self._pin_down.value
+        if raw_down != self._last_raw_down:
+            if self._last_raw_down and not raw_down:
+                down = 1
+            self._last_raw_down = raw_down
+
+        left = 0
+        raw_left = self._pin_left.value
+        if raw_left != self._last_raw_left:
+            if self._last_raw_left and not raw_left:
+                left = 1
+            self._last_raw_left = raw_left
+
+        dy = (down - up) * self.sensitivity
+        dx = (right - left) * self.sensitivity
+
+        if dx != 0 or dy != 0:
+            trigger_bus.execute_output(self.output_name, {"action": "move", "dx": dx, "dy": dy})
+
+        self._process_button(now)
+
+    def _process_button(self, now):
+        raw_pressed = not self._btn.value
+
+        if raw_pressed != self._last_raw_btn:
+            self._last_raw_btn = raw_pressed
+            self._btn_change_t = now
+
+        if (now - self._btn_change_t) * 1000 < self.debounce_ms:
+            return
+
+        if raw_pressed == self._last_stable_btn:
+            return
+
+        self._last_stable_btn = raw_pressed
+
+        if raw_pressed:
+            if (now - self._first_click_t) * 1000 > self.triple_click_window_ms:
+                self._click_count = 0
+                self._first_click_t = now
+
+            self._click_count += 1
+
+            if self._click_count == self.triple_click_count:
+                if self._btn_is_down:
+                    trigger_bus.execute_output(self.output_name, {"action": "release", "button": "left"})
+                    self._btn_is_down = False
+
+                if self.triple_click_mode == "scenario":
+                    trigger_bus.fire(f"{self.input_id}_triple_click", trigger_bus.PRIORITY_HIGH)
+                else:
+                    trigger_bus.execute_output(self.output_name, {"action": "click", "button": "right"})
+
+                self._click_count = 0
+            else:
+                if self.click_mode == "scenario":
+                    trigger_bus.fire(f"{self.input_id}_click", trigger_bus.PRIORITY_HIGH)
+                else:
+                    trigger_bus.execute_output(self.output_name, {"action": "press", "button": "left"})
+                    self._btn_is_down = True
+        else:
+            if self._btn_is_down:
+                trigger_bus.execute_output(self.output_name, {"action": "release", "button": "left"})
+                self._btn_is_down = False
+
     def _make_input_pullup(self, pin_num):
         pin = digitalio.DigitalInOut(getattr(board, "GP" + str(pin_num)))
         pin.direction = digitalio.Direction.INPUT
@@ -293,7 +441,11 @@ class InputsManager:
         
         for input_id, input_cfg in inputs_config.items():
             input_type = input_cfg.get("type")
-            
+
+            if not input_cfg.get("enabled", True):
+                print(f"[inputs] '{input_id}' disabled in config — skipping")
+                continue
+
             try:
                 if input_type == "hall":
                     handler = HallSensorInput(input_id, input_cfg, self._hall_debounce_ms, self._armed)
@@ -301,6 +453,10 @@ class InputsManager:
                 
                 elif input_type == "power_monitor":
                     handler = PowerMonitorInput(input_id, input_cfg, i2c)
+                    self._inputs.append(handler)
+                
+                elif input_type == "trackball":
+                    handler = TrackballInput(input_id, input_cfg)
                     self._inputs.append(handler)
                 
                 else:

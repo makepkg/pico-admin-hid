@@ -57,11 +57,15 @@ print("[main] active_menu:", len(root_menu), "items")
 trigger_bus.init()
 
 print("[main] Init display...")
-try:
-    display = DisplayManager()
-    display.show_boot()
-except Exception as e:
-    print("[main] Display init failed:", e)
+if config.get_config().get("device", {}).get("display_enabled", True):
+    try:
+        display = DisplayManager()
+        display.show_boot()
+    except Exception as e:
+        print("[main] Display init failed:", e)
+        display = None
+else:
+    print("[main] Display disabled in config")
     display = None
 
 splash_trigger = SplashTrigger()
@@ -73,7 +77,15 @@ inputs = InputsManager(i2c=display.i2c if display else None)
 inputs.startup_blink()
 
 print("[main] Init encoder...")
-encoder = EncoderHandler()
+if config.get_config().get("device", {}).get("encoder_enabled", True):
+    try:
+        encoder = EncoderHandler()
+    except Exception as e:
+        print("[main] Encoder init failed:", e)
+        encoder = None
+else:
+    print("[main] Encoder disabled in config")
+    encoder = None
 
 
 # ── 3. Вспомогательные функции ─────────────────────────────────────────────
@@ -91,7 +103,7 @@ def get_current_action():
         return ""
     item = current_menu_list[menu_cursor]
     # Папка без sequence — показываем индикатор вложенного меню
-    if "sequence" not in item:
+    if "sequence" not in item and "pipeline" not in item:
         return ">> Open"
     return trigger_bus.get_next_action_name(item["id"])
 
@@ -233,7 +245,8 @@ def on_encoder_event(event):
 
 
 # Подключаем callback — с этого момента encoder.update() будет его вызывать
-encoder.set_callback(on_encoder_event)
+if encoder:
+    encoder.set_callback(on_encoder_event)
 
 
 # ── 6. Первый кадр ─────────────────────────────────────────────────────────
@@ -305,7 +318,8 @@ while True:
     inputs.update()
 
     # Активная система: энкодер — события идут через on_encoder_event()
-    encoder.update()
+    if encoder:
+        encoder.update()
 
     # Таймер автовыключения / заставки экрана
     now = time.monotonic()
@@ -314,14 +328,14 @@ while True:
             if screensaver_name == "off":
                 if display:
                     display.sleep()
-                screen_sleeping = True
-                print("[main] Display sleep")
+                    screen_sleeping = True
+                    print("[main] Display sleep")
             else:
                 if display:
                     display.start_screensaver(screensaver_name)
-                screensaver_active = True
-                splash_trigger.reset_timer()  # Сброс таймера при входе в screensaver
-                print("[main] Screensaver started:", screensaver_name)
+                    screensaver_active = True
+                    splash_trigger.reset_timer()  # Сброс таймера при входе в screensaver
+                    print("[main] Screensaver started:", screensaver_name)
 
     # Обновление кадров заставки (~20 FPS)
     ina_warning_blocking = warning_screen and warning_screen.is_active
@@ -352,7 +366,7 @@ while True:
             
             if splash_screen and splash_trigger.tick(is_idle, ina_available):
                 # Если дисплей спал — разбудить перед показом
-                if screen_sleeping:
+                if screen_sleeping and display:
                     display.wake()
                     screen_sleeping = False
                 

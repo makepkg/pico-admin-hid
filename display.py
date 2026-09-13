@@ -11,7 +11,7 @@ terminalio — встроен в CircuitPython 7+.
 Компоновка экрана 128×32 (anchor_point = (0.5, 0.5) — центр по горизонтали и вертикали):
   y= 4  — верхняя строка  (статус / заголовок)
   y=16  — центральная     (имя текущего пункта меню)
-  y=27  — нижняя строка   (следующее действие / подсказка)
+  y=24  — нижняя строка   (следующее действие / подсказка)
 """
 
 import board
@@ -40,46 +40,56 @@ class DisplayManager:
         scl = getattr(board, "GP" + str(scl_num))
 
         displayio.release_displays()
-        i2c = busio.I2C(scl=scl, sda=sda, frequency=400_000)
-        self.i2c = i2c
+        i2c = None
+        try:
+            i2c = busio.I2C(scl=scl, sda=sda, frequency=400_000)
+            self.i2c = i2c
 
-        # ИСПРАВЛЕНО: i2cdisplaybus.I2CDisplayBus вместо displayio.I2CDisplay
-        bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=_ADDR)
-        self._disp = adafruit_displayio_ssd1306.SSD1306(bus, width=_W, height=_H)
+            # ИСПРАВЛЕНО: i2cdisplaybus.I2CDisplayBus вместо displayio.I2CDisplay
+            bus = i2cdisplaybus.I2CDisplayBus(i2c, device_address=_ADDR)
+            self._disp = adafruit_displayio_ssd1306.SSD1306(bus, width=_W, height=_H)
 
-        _cx = _W // 2   # 64 — горизонтальный центр экрана
+            _cx = _W // 2   # 64 — горизонтальный центр экрана
 
-        # ── Основная группа: 3 переиспользуемых лейбла ──────────────────
-        self._main_group = displayio.Group()
-        self._lbl_top    = self._make_label(" ", _cx, 4)
-        self._lbl_center = self._make_label(" ", _cx, 16)
-        self._lbl_bottom = self._make_label(" ", _cx, 27)
-        self._main_group.append(self._lbl_top)
-        self._main_group.append(self._lbl_center)
-        self._main_group.append(self._lbl_bottom)
-        self._disp.root_group = self._main_group
+            # ── Основная группа: 3 переиспользуемых лейбла ──────────────────
+            self._main_group = displayio.Group()
+            self._lbl_top    = self._make_label(" ", _cx, 4)
+            self._lbl_center = self._make_label(" ", _cx, 16)
+            self._lbl_bottom = self._make_label(" ", _cx, 24)
+            self._main_group.append(self._lbl_top)
+            self._main_group.append(self._lbl_center)
+            self._main_group.append(self._lbl_bottom)
+            self._disp.root_group = self._main_group
 
-        # ── Группа анимации: два лейбла, пересоздаются не в цикле ───────
-        self._anim_group   = displayio.Group()
-        self._lbl_anim_old = self._make_label(" ", _cx,      16)
-        self._lbl_anim_new = self._make_label(" ", _cx + _W, 16)
-        self._anim_group.append(self._lbl_anim_old)
-        self._anim_group.append(self._lbl_anim_new)
+            # ── Группа анимации: два лейбла, пересоздаются не в цикле ───────
+            self._anim_group   = displayio.Group()
+            self._lbl_anim_old = self._make_label(" ", _cx,      16)
+            self._lbl_anim_new = self._make_label(" ", _cx + _W, 16)
+            self._anim_group.append(self._lbl_anim_old)
+            self._anim_group.append(self._lbl_anim_new)
 
-        # ── Группа скринсейвера ─────────────────────────────────────────
-        self._screensaver_bitmap = displayio.Bitmap(_W, _H, 2)
-        self._screensaver_palette = displayio.Palette(2)
-        self._screensaver_palette[0] = 0x000000
-        self._screensaver_palette[1] = 0xFFFFFF
-        self._screensaver_tile_grid = displayio.TileGrid(
-            self._screensaver_bitmap,
-            pixel_shader=self._screensaver_palette
-        )
-        self._screensaver_group = displayio.Group()
-        self._screensaver_group.append(self._screensaver_tile_grid)
-        self._screensaver_manager = None
+            # ── Группа скринсейвера ─────────────────────────────────────────
+            self._screensaver_bitmap = displayio.Bitmap(_W, _H, 2)
+            self._screensaver_palette = displayio.Palette(2)
+            self._screensaver_palette[0] = 0x000000
+            self._screensaver_palette[1] = 0xFFFFFF
+            self._screensaver_tile_grid = displayio.TileGrid(
+                self._screensaver_bitmap,
+                pixel_shader=self._screensaver_palette
+            )
+            self._screensaver_group = displayio.Group()
+            self._screensaver_group.append(self._screensaver_tile_grid)
+            self._screensaver_manager = None
 
-        print("[display] init OK  SDA=GP", sda_num, " SCL=GP", scl_num)
+            print("[display] init OK  SDA=GP", sda_num, " SCL=GP", scl_num)
+        except Exception:
+            if i2c is not None:
+                try:
+                    i2c.deinit()
+                except Exception:
+                    pass
+            self.i2c = None
+            raise
 
     # ── Public: основные экраны ────────────────────────────────────────────
 

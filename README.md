@@ -79,7 +79,7 @@ See [Pipelines Guide](docs/user/pipelines.md) for how Input → Pipeline → Out
 **Consider alternatives when**:
 - You need more than 20-30 frequently-used commands (Stream Deck has more buttons)
 - Color display is required (Stream Deck)
-- You need mouse control (not yet implemented)
+- You need more than basic relative mouse movement/clicks (trackball input already supports this — see `docs/developers/outputs.md`)
 - WiFi remote triggers are essential (requires Pico W variant)
 
 ---

@@ -726,6 +726,12 @@
             border: 1px solid rgba(0, 255, 136, 0.3);
         }
 
+        .badge-mouse {
+            background: rgba(255, 136, 0, 0.15);
+            color: #ff8800;
+            border: 1px solid rgba(255, 136, 0, 0.3);
+        }
+
         .info-box {
             margin-top: 8px;
             padding: 8px;
@@ -811,65 +817,89 @@
                 <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 Save config.json
             </button>
+
+            <button id="zoom-btn" class="btn btn-primary" onclick="cycleZoom()" style="width: 40px; height: 40px; padding: 0; font-size: 0.85rem; font-weight: 700;">
+                0
+            </button>
         </div>
     </header>
 
     <div class="workspace">
         <!-- Sidebar: Device Settings -->
         <aside class="sidebar">
+
             <div>
-                <h3 class="section-title">Device Configuration</h3>
+                <h3 class="section-title">Display & Encoder</h3>
                 <div class="card">
                     <div class="checkbox-group">
-                        <input type="checkbox" id="dev-armed" onchange="updateDeviceField('armed', this.checked)">
-                        <label for="dev-armed">Armed (Hall Sensors active)</label>
-                    </div>
-                    <div class="form-group">
-                        <label for="dev-debounce">Hall Debounce (ms)</label>
-                        <input type="number" id="dev-debounce" onchange="updateDeviceField('debounce_ms', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('debounce_ms', parseInt(this.value)); this.blur(); }">
-                    </div>
-                    <div class="form-group">
-                        <label for="dev-cooldown">Cooldown (ms)</label>
-                        <input type="number" id="dev-cooldown" onchange="updateDeviceField('cooldown_ms', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('cooldown_ms', parseInt(this.value)); this.blur(); }">
-                    </div>
-                    <div class="form-group">
-                        <label for="dev-screen-timeout" style="display: flex; align-items: center;">
-                            Screen Timeout (seconds)
-                            <span class="tooltip-icon" data-tip="Seconds of inactivity before screensaver activates">?</span>
+                        <input type="checkbox" id="dev-display-enabled" onchange="updateDeviceField('display_enabled', this.checked); updateDisplayGraying();">
+                        <label for="dev-display-enabled" style="display: flex; align-items: center;">
+                            Display Enabled
+                            <span class="tooltip-icon" data-tip="Enable or disable OLED display. When disabled, display pins are freed and display.py is not initialized">?</span>
                         </label>
-                        <input type="number" id="dev-screen-timeout" onchange="updateDeviceField('screen_timeout_s', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('screen_timeout_s', parseInt(this.value)); this.blur(); }" placeholder="0 to disable">
                     </div>
-                    <div class="form-group">
-                        <label for="dev-screensaver" style="display: flex; align-items: center;">
-                            Screensaver Mode
-                            <span class="tooltip-icon" data-tip="Visual animation shown when device is idle">?</span>
+                    <div id="display-config-fields" style="transition: opacity 0.2s;">
+                        <div class="pin-grid">
+                            <div class="form-group">
+                                <label for="hw-sda">OLED SDA</label>
+                                <input type="number" id="hw-sda" onchange="updateHardwareField('display_sda', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('display_sda', parseInt(this.value)); this.blur(); }">
+                            </div>
+                            <div class="form-group">
+                                <label for="hw-scl">OLED SCL</label>
+                                <input type="number" id="hw-scl" onchange="updateHardwareField('display_scl', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('display_scl', parseInt(this.value)); this.blur(); }">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="dev-screen-timeout" style="display: flex; align-items: center;">
+                                Screen Timeout (seconds)
+                                <span class="tooltip-icon" data-tip="Seconds of inactivity before screensaver activates">?</span>
+                            </label>
+                            <input type="number" id="dev-screen-timeout" onchange="updateDeviceField('screen_timeout_s', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateDeviceField('screen_timeout_s', parseInt(this.value)); this.blur(); }" placeholder="0 to disable">
+                        </div>
+                        <div class="form-group">
+                            <label for="dev-screensaver" style="display: flex; align-items: center;">
+                                Screensaver Mode
+                                <span class="tooltip-icon" data-tip="Visual animation shown when device is idle">?</span>
+                            </label>
+                            <select id="dev-screensaver" onchange="updateDeviceField('screensaver', this.value)">
+                                <option value="off">Off (Screen turns black)</option>
+                                <option value="tesseract">4D Tesseract Animation</option>
+                                <option value="starfield">3D Starfield Animation</option>
+                                <option value="matrix">Matrix Rain Animation</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="checkbox-group" style="margin-top: 14px;">
+                        <input type="checkbox" id="dev-encoder-enabled" onchange="updateDeviceField('encoder_enabled', this.checked); updateEncoderGraying();">
+                        <label for="dev-encoder-enabled" style="display: flex; align-items: center;">
+                            Encoder Enabled
+                            <span class="tooltip-icon" data-tip="Enable or disable rotary encoder. When disabled, encoder pins are freed and encoder.py is not initialized">?</span>
                         </label>
-                        <select id="dev-screensaver" onchange="updateDeviceField('screensaver', this.value)">
-                            <option value="off">Off (Screen turns black)</option>
-                            <option value="tesseract">4D Tesseract Animation</option>
-                            <option value="starfield">3D Starfield Animation</option>
-                            <option value="matrix">Matrix Rain Animation</option>
-                        </select>
+                    </div>
+                    <div id="encoder-config-fields" style="transition: opacity 0.2s;">
+                        <div class="pin-grid">
+                            <div class="form-group">
+                                <label for="hw-enc-clk">Encoder CLK</label>
+                                <input type="number" id="hw-enc-clk" onchange="updateHardwareField('encoder_clk', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_clk', parseInt(this.value)); this.blur(); }">
+                            </div>
+                            <div class="form-group">
+                                <label for="hw-enc-dt">Encoder DT</label>
+                                <input type="number" id="hw-enc-dt" onchange="updateHardwareField('encoder_dt', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_dt', parseInt(this.value)); this.blur(); }">
+                            </div>
+                            <div class="form-group">
+                                <label for="hw-enc-sw">Encoder SW</label>
+                                <input type="number" id="hw-enc-sw" onchange="updateHardwareField('encoder_sw', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_sw', parseInt(this.value)); this.blur(); }">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div>
-                <h3 class="section-title">Hardware Pins Configuration</h3>
+                <h3 class="section-title">Core Hardware</h3>
                 <div class="card">
                     <div class="pin-grid">
-                        <div class="form-group">
-                            <label for="hw-enc-clk">Encoder CLK</label>
-                            <input type="number" id="hw-enc-clk" onchange="updateHardwareField('encoder_clk', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_clk', parseInt(this.value)); this.blur(); }">
-                        </div>
-                        <div class="form-group">
-                            <label for="hw-enc-dt">Encoder DT</label>
-                            <input type="number" id="hw-enc-dt" onchange="updateHardwareField('encoder_dt', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_dt', parseInt(this.value)); this.blur(); }">
-                        </div>
-                        <div class="form-group">
-                            <label for="hw-enc-sw">Encoder SW</label>
-                            <input type="number" id="hw-enc-sw" onchange="updateHardwareField('encoder_sw', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('encoder_sw', parseInt(this.value)); this.blur(); }">
-                        </div>
                         <div class="form-group">
                             <label for="hw-btn">Button Pin</label>
                             <input type="number" id="hw-btn" onchange="updateHardwareField('button_pin', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('button_pin', parseInt(this.value)); this.blur(); }">
@@ -877,14 +907,6 @@
                         <div class="form-group">
                             <label for="hw-led">LED Pin</label>
                             <input type="number" id="hw-led" onchange="updateHardwareField('led_pin', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('led_pin', parseInt(this.value)); this.blur(); }">
-                        </div>
-                        <div class="form-group">
-                            <label for="hw-sda">OLED SDA</label>
-                            <input type="number" id="hw-sda" onchange="updateHardwareField('display_sda', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('display_sda', parseInt(this.value)); this.blur(); }">
-                        </div>
-                        <div class="form-group">
-                            <label for="hw-scl">OLED SCL</label>
-                            <input type="number" id="hw-scl" onchange="updateHardwareField('display_scl', parseInt(this.value))" onkeydown="if(event.key==='Enter') { updateHardwareField('display_scl', parseInt(this.value)); this.blur(); }">
                         </div>
                     </div>
                 </div>
@@ -901,11 +923,27 @@
                     <div id="hall-sensors-container" style="display:flex; flex-direction:column; gap:8px;">
                         <!-- Loaded dynamically -->
                     </div>
+                    <div id="hall-global-settings" class="card" style="margin-top: 8px;">
+                        <!-- Loaded dynamically by renderHallGlobalSettings() -->
+                    </div>
                 </div>
 
                 <div style="margin-top: 1rem;">
-                    <h4 class="section-title" style="font-size: 0.8rem;">Power Monitor</h4>
+                    <h4 class="section-title" style="font-size: 0.8rem;">
+                        <span>Power Monitor</span>
+                        <button class="btn btn-sm btn-primary" onclick="addPowerMonitor()" style="padding: 2px 6px;">+ Add</button>
+                    </h4>
                     <div id="ina226-config-container" class="card">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem;">
+                    <h4 class="section-title" style="font-size: 0.8rem;">
+                        <span>Trackball Inputs</span>
+                        <button class="btn btn-sm btn-primary" onclick="addTrackballInput()" style="padding: 2px 6px;">+ Add</button>
+                    </h4>
+                    <div id="trackball-inputs-container" style="display:flex; flex-direction:column; gap:8px;">
                         <!-- Loaded dynamically -->
                     </div>
                 </div>
@@ -915,6 +953,8 @@
                 <h3 class="section-title">
                     <span>Outputs Configuration</span>
                     <button class="btn btn-sm btn-primary" onclick="addGpioOutput()" style="padding: 2px 6px;">+ GPIO</button>
+                    <button class="btn btn-sm btn-primary" onclick="addMouseOutput()" style="padding: 2px 6px;">+ Mouse</button>
+                    <button class="btn btn-sm btn-primary" onclick="addSerialOutput()" style="padding: 2px 6px;">+ Serial</button>
                 </h3>
                 <div id="outputs-config-container" style="display:flex; flex-direction:column; gap:10px;">
                     <!-- Loaded dynamically -->
@@ -1231,6 +1271,13 @@
                 serializeOutputsToConfig();
             }
 
+            // ВАЖНО: Перед входом в Raw Code синхронизируем изменения из визуального редактора
+            if (tabId === 'tab-raw') {
+                // Собираем все изменения из визуального редактора в configData
+                serializeOutputsToConfig();
+                // Device settings и hall sensors уже обновляются через updateDeviceField/updateHardwareField
+            }
+
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
@@ -1348,11 +1395,13 @@
             validateMenuPipelines(configData.active_menu);
 
             // Sidebar values
-            document.getElementById('dev-armed').checked = !!configData.device.armed;
-            document.getElementById('dev-debounce').value = configData.device.debounce_ms || 300;
-            document.getElementById('dev-cooldown').value = configData.device.cooldown_ms || 5000;
+            document.getElementById('dev-display-enabled').checked = configData.device.display_enabled !== false;
+            document.getElementById('dev-encoder-enabled').checked = configData.device.encoder_enabled !== false;
             document.getElementById('dev-screen-timeout').value = configData.device.screen_timeout_s || 0;
             document.getElementById('dev-screensaver').value = configData.device.screensaver || "off";
+
+            updateDisplayGraying();
+            updateEncoderGraying();
 
             // Hardware Pin fields
             document.getElementById('hw-enc-clk').value = configData.hardware.encoder_clk || 6;
@@ -1388,6 +1437,7 @@
                     selectedItemRef.item = liveItem;
                 }
             }
+            updateRawJsonIfVisible();
         }
 
         // Save and Download config.json
@@ -1609,10 +1659,34 @@
         // Device form updates
         function updateDeviceField(field, val) {
             configData.device[field] = val;
+            updateRawJsonIfVisible();
         }
 
         function updateHardwareField(field, val) {
             configData.hardware[field] = val;
+            updateRawJsonIfVisible();
+        }
+
+        // Helper: Update Raw JSON textarea if it's visible
+        function updateRawJsonIfVisible() {
+            const rawTab = document.getElementById('tab-raw');
+            if (rawTab && rawTab.classList.contains('active')) {
+                document.getElementById('raw-json-textarea').value = JSON.stringify(configData, null, 2);
+            }
+        }
+
+        function updateDisplayGraying() {
+            const enabled = document.getElementById('dev-display-enabled').checked;
+            const el = document.getElementById('display-config-fields');
+            el.style.opacity = enabled ? '1' : '0.4';
+            el.style.pointerEvents = enabled ? 'auto' : 'none';
+        }
+
+        function updateEncoderGraying() {
+            const enabled = document.getElementById('dev-encoder-enabled').checked;
+            const el = document.getElementById('encoder-config-fields');
+            el.style.opacity = enabled ? '1' : '0.4';
+            el.style.pointerEvents = enabled ? 'auto' : 'none';
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1624,17 +1698,24 @@
             
             const hallContainer = document.getElementById('hall-sensors-container');
             const inaContainer = document.getElementById('ina226-config-container');
+            const trackballContainer = document.getElementById('trackball-inputs-container');
             
             if (!configData || !configData.inputs) return;
             
             // Render Hall Sensors
             if (hallContainer) {
                 renderHallSensorsInputs(hallContainer);
+                renderHallGlobalSettings();
             }
             
             // Render INA226
             if (inaContainer) {
                 renderPowerMonitorInput(inaContainer);
+            }
+            
+            // Render Trackball Inputs
+            if (trackballContainer) {
+                renderTrackballInput(trackballContainer);
             }
         }
 
@@ -1726,35 +1807,55 @@
             });
         }
 
+        function renderHallGlobalSettings() {
+            const container = document.getElementById('hall-global-settings');
+            if (!container) return;
+
+            const hallInputs = Object.entries(configData.inputs).filter(([id, cfg]) => cfg.type === "hall");
+
+            if (hallInputs.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            const dev = configData.device || {};
+            const armed = dev.armed !== false;
+
+            container.innerHTML = `
+                <div class="checkbox-group">
+                    <input type="checkbox" id="hall-armed" ${armed ? 'checked' : ''} 
+                        onchange="updateDeviceField('armed', this.checked); renderHallGlobalSettings();">
+                    <label for="hall-armed">Armed (sensors active)</label>
+                </div>
+                <div id="hall-settings-fields" style="opacity: ${armed ? '1' : '0.4'}; pointer-events: ${armed ? 'auto' : 'none'}; transition: opacity 0.2s;">
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Debounce (ms)
+                            <span class="tooltip-icon" data-tip="Minimum time between Hall sensor triggers">?</span>
+                        </label>
+                        <input type="number" value="${dev.debounce_ms ?? 300}" 
+                            onchange="updateDeviceField('debounce_ms', parseInt(this.value))" 
+                            onkeydown="if(event.key==='Enter') { updateDeviceField('debounce_ms', parseInt(this.value)); this.blur(); }">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center;">
+                            Cooldown (ms)
+                            <span class="tooltip-icon" data-tip="Also applies to menu click triggers, not only Hall sensors">?</span>
+                        </label>
+                        <input type="number" value="${dev.cooldown_ms ?? 5000}" 
+                            onchange="updateDeviceField('cooldown_ms', parseInt(this.value))" 
+                            onkeydown="if(event.key==='Enter') { updateDeviceField('cooldown_ms', parseInt(this.value)); this.blur(); }">
+                    </div>
+                </div>
+            `;
+        }
+
         function renderPowerMonitorInput(container) {
             const inaConfig = configData.inputs.ina226;
             
             if (!inaConfig || inaConfig.type !== "power_monitor") {
-                // Create default if not exists
-                configData.inputs.ina226 = {
-                    type: "power_monitor",
-                    enabled: false,
-                    trigger_mode: "percent",
-                    threshold_percent: 15,
-                    threshold_voltage: 16.5,
-                    warning_offset_percent: 5,
-                    recovery_offset_percent: 10,
-                    trigger_attempts: 3,
-                    trigger_attempt_interval_sec: 60,
-                    read_interval_sec: 5.0,
-                    warning_enabled: true,
-                    warning_blink_interval: 0.5,
-                    warning_canceled_display_sec: 2.0,
-                    splash_interval_sec: 1800,
-                    splash_duration_sec: 6,
-                    battery_max_v: 21.0,
-                    battery_min_v: 15.0,
-                    shunt_ohms: 0.1,
-                    i2c_scl: 5,
-                    i2c_sda: 4,
-                    i2c_address: 64
-                };
-                return renderPowerMonitorInput(container);
+                container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:8px;">No power monitor defined</div>`;
+                return;
             }
             
             const cfg = inaConfig;
@@ -1762,10 +1863,13 @@
             const isEnabled = cfg.enabled;
             
             container.innerHTML = `
-                <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-                    <label style="margin:0;">Enable trigger</label>
-                    <input type="checkbox" ${cfg.enabled ? 'checked' : ''}
-                        onchange="updateInputField('ina226', 'enabled', this.checked); renderInputsConfig(); renderPassiveTriggers();">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin:0;">
+                        <label style="margin:0;">Enable trigger</label>
+                        <input type="checkbox" ${cfg.enabled ? 'checked' : ''}
+                            onchange="updateInputField('ina226', 'enabled', this.checked); renderInputsConfig(); renderPassiveTriggers();">
+                    </div>
+                    <button class="btn btn-danger btn-sm" onclick="deleteInput('ina226'); renderInputsConfig(); renderPassiveTriggers();" style="padding: 2px 8px; font-size: 0.75rem;">🗑️ Delete</button>
                 </div>
 
                 <div style="opacity: ${isEnabled ? '1' : '0.4'}; pointer-events: ${isEnabled ? 'auto' : 'none'}; transition: opacity 0.2s;">
@@ -1939,6 +2043,146 @@
             `;
         }
 
+        function renderTrackballInput(container) {
+            if (!configData || !configData.inputs) return;
+            
+            const entries = Object.entries(configData.inputs)
+                .filter(([id, cfg]) => cfg.type === 'trackball');
+
+            if (entries.length === 0) {
+                container.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:8px;">No trackball inputs defined</div>`;
+                return;
+            }
+
+            container.innerHTML = '';
+
+            entries.forEach(([id, cfg]) => {
+                const isEnabled = cfg.enabled !== false;
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.marginBottom = '8px';
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="font-weight: 500; font-family: var(--font-mono); color: var(--accent-cyan);">🕹️ ${id}</div>
+                        <button class="btn btn-danger btn-sm" onclick="deleteInput('${id}')" style="padding: 2px 8px; font-size: 0.75rem;">🗑️ Delete</button>
+                    </div>
+
+                    <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                        <label style="margin:0;">Enabled</label>
+                        <input type="checkbox" ${isEnabled ? 'checked' : ''}
+                            onchange="updateInputField('${id}', 'enabled', this.checked); renderInputsConfig();">
+                    </div>
+
+                    <div style="opacity: ${isEnabled ? '1' : '0.4'}; pointer-events: ${isEnabled ? 'auto' : 'none'}; transition: opacity 0.2s;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin-bottom: 10px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem;">UP Pin</label>
+                                <input type="number" value="${cfg.pin_up ?? ''}" placeholder="Pin"
+                                    onchange="updateInputField('${id}', 'pin_up', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem;">DOWN Pin</label>
+                                <input type="number" value="${cfg.pin_down ?? ''}" placeholder="Pin"
+                                    onchange="updateInputField('${id}', 'pin_down', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem;">LEFT Pin</label>
+                                <input type="number" value="${cfg.pin_left ?? ''}" placeholder="Pin"
+                                    onchange="updateInputField('${id}', 'pin_left', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem;">RIGHT Pin</label>
+                                <input type="number" value="${cfg.pin_right ?? ''}" placeholder="Pin"
+                                    onchange="updateInputField('${id}', 'pin_right', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem;">BUTTON Pin</label>
+                                <input type="number" value="${cfg.pin_button ?? ''}" placeholder="Pin"
+                                    onchange="updateInputField('${id}', 'pin_button', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Sensitivity
+                                    <span class="tooltip-icon" data-tip="Mouse movement multiplier. Higher = faster cursor movement">?</span>
+                                </label>
+                                <input type="number" value="${cfg.sensitivity ?? 1}" min="1" max="10"
+                                    onchange="updateInputField('${id}', 'sensitivity', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Debounce (ms)
+                                    <span class="tooltip-icon" data-tip="Debounce time for direction inputs in milliseconds">?</span>
+                                </label>
+                                <input type="number" value="${cfg.debounce_ms ?? 15}" min="5" max="100"
+                                    onchange="updateInputField('${id}', 'debounce_ms', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Triple-click window (ms)
+                                    <span class="tooltip-icon" data-tip="Time window for detecting triple-clicks in milliseconds">?</span>
+                                </label>
+                                <input type="number" value="${cfg.triple_click_window_ms ?? 1000}" min="100" max="5000"
+                                    onchange="updateInputField('${id}', 'triple_click_window_ms', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Triple-click count
+                                    <span class="tooltip-icon" data-tip="Number of clicks required to trigger triple-click action">?</span>
+                                </label>
+                                <input type="number" value="${cfg.triple_click_count ?? 3}" min="2" max="10"
+                                    onchange="updateInputField('${id}', 'triple_click_count', parseInt(this.value))"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Output
+                                    <span class="tooltip-icon" data-tip="Name of the mouse output to send movements to">?</span>
+                                </label>
+                                <input type="text" value="${cfg.output ?? 'mouse'}" placeholder="mouse"
+                                    onchange="updateInputField('${id}', 'output', this.value)"
+                                    onkeydown="if(event.key==='Enter') this.blur();">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 8px;">
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Click Mode
+                                    <span class="tooltip-icon" data-tip="Mouse: left-click/drag as usual. Scenario: single click fires a configured pipeline instead (no drag)">?</span>
+                                </label>
+                                <select onchange="updateInputField('${id}', 'click_mode', this.value); renderPassiveTriggers();">
+                                    <option value="mouse" ${(cfg.click_mode ?? 'mouse') === 'mouse' ? 'selected' : ''}>Mouse (LMB)</option>
+                                    <option value="scenario" ${cfg.click_mode === 'scenario' ? 'selected' : ''}>Scenario</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label style="font-size: 0.75rem; display: flex; align-items: center;">
+                                    Triple-click Mode
+                                    <span class="tooltip-icon" data-tip="Mouse: right-click as usual. Scenario: triple-click fires a configured pipeline instead">?</span>
+                                </label>
+                                <select onchange="updateInputField('${id}', 'triple_click_mode', this.value); renderPassiveTriggers();">
+                                    <option value="mouse" ${(cfg.triple_click_mode ?? 'mouse') === 'mouse' ? 'selected' : ''}>Mouse (RMB)</option>
+                                    <option value="scenario" ${cfg.triple_click_mode === 'scenario' ? 'selected' : ''}>Scenario</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
         function addHallSensor() {
             const count = Object.keys(configData.inputs).filter(k => configData.inputs[k].type === "hall").length + 1;
             const newId = `hall_sensor_${count}`;
@@ -1955,6 +2199,60 @@
             
             renderInputsConfig();
             renderPassiveTriggers();
+        }
+
+        function addTrackballInput() {
+            const count = Object.keys(configData.inputs).filter(k => configData.inputs[k].type === "trackball").length + 1;
+            const newId = `trackball_${count}`;
+            
+            configData.inputs[newId] = {
+                type: "trackball",
+                pin_up: 10,
+                pin_down: 11,
+                pin_left: 12,
+                pin_right: 13,
+                pin_button: 14,
+                sensitivity: 1,
+                debounce_ms: 15,
+                triple_click_window_ms: 1000,
+                triple_click_count: 3,
+                output: "mouse"
+            };
+            
+            renderInputsConfig();
+        }
+
+        function addPowerMonitor() {
+            if (configData.inputs.ina226) {
+                alert('❌ Power Monitor already exists!');
+                return;
+            }
+
+            configData.inputs.ina226 = {
+                type: "power_monitor",
+                enabled: false,
+                trigger_mode: "percent",
+                threshold_percent: 15,
+                threshold_voltage: 16.5,
+                warning_offset_percent: 5,
+                recovery_offset_percent: 10,
+                trigger_attempts: 3,
+                trigger_attempt_interval_sec: 60,
+                read_interval_sec: 5.0,
+                warning_enabled: true,
+                warning_blink_interval: 0.5,
+                warning_canceled_display_sec: 2.0,
+                splash_interval_sec: 1800,
+                splash_duration_sec: 6,
+                battery_max_v: 21.0,
+                battery_min_v: 15.0,
+                shunt_ohms: 0.1,
+                i2c_scl: 5,
+                i2c_sda: 4,
+                i2c_address: 64
+            };
+
+            renderInputsConfig();
         }
 
         function updateInputField(inputId, field, val) {
@@ -1994,6 +2292,7 @@
             delete configData.inputs[inputId];
             renderInputsConfig();
             renderPassiveTriggers();
+            renderHallGlobalSettings();
         }
 
         // Passive sensors list
@@ -2015,6 +2314,13 @@
                         triggers.push({ id: inputId, label: `Hall sensor (${inputId})` });
                     } else if (inputCfg.type === "power_monitor") {
                         triggers.push({ id: inputId, label: `Power Monitor (${inputId})` });
+                    } else if (inputCfg.type === "trackball") {
+                        if (inputCfg.click_mode === "scenario") {
+                            triggers.push({ id: `${inputId}_click`, label: `Trackball Click (${inputId})`, parentId: inputId });
+                        }
+                        if (inputCfg.triple_click_mode === "scenario") {
+                            triggers.push({ id: `${inputId}_triple_click`, label: `Trackball Triple-Click (${inputId})`, parentId: inputId });
+                        }
                     }
                 });
             }
@@ -2041,7 +2347,8 @@
                 }
 
                 // Check if input is enabled (for visual indication)
-                const inputCfg = configData.inputs[t.id];
+                // Virtual triggers (trackball_1_click) look up their parentId instead of t.id
+                const inputCfg = configData.inputs[t.parentId || t.id];
                 const isEnabled = inputCfg ? (inputCfg.enabled !== false) : true; // hall sensors always enabled
 
                 const card = document.createElement('div');
@@ -2052,10 +2359,10 @@
                 card.style.transition = 'opacity 0.2s, background 0.2s';
                 
                 // Determine if Add button should be disabled
-                const shouldDisableAdd = !triggerConfig.loop && triggerConfig.pipeline.length > 0;
+                const shouldDisableAdd = triggerConfig.loop && triggerConfig.pipeline.length >= 2;
                 const addButtonDisabled = shouldDisableAdd ? 'disabled' : '';
                 const addButtonStyle = shouldDisableAdd ? 'opacity: 0.5; cursor: not-allowed;' : '';
-                const addButtonTitle = shouldDisableAdd ? 'Cannot add more scenarios when Loop is OFF (only one scenario allowed)' : '';
+                const addButtonTitle = shouldDisableAdd ? 'Loop mode allows at most 2 scenarios (e.g. Start/Stop toggle)' : '';
                 
                 const disabledIndicator = !isEnabled ? '<span style="color:var(--text-muted); font-size:0.75rem; margin-left:8px;">(disabled)</span>' : '';
                 
@@ -2155,8 +2462,17 @@
             if (!configData.passive[triggerId]) {
                 configData.passive[triggerId] = { pipeline: [], loop: false };
             }
-            configData.passive[triggerId].loop = loopValue;
-            // Re-render to update Add button state
+
+            const trigger = configData.passive[triggerId];
+
+            if (loopValue && trigger.pipeline.length > 2) {
+                alert('❌ Cannot turn Loop ON while more than 2 scenarios are in the pipeline.\n\nLoop mode cycles between exactly 2 scenarios (e.g. Start/Stop). Delete extra scenarios first (leave at most 2), then turn Loop on.');
+                const checkbox = document.getElementById(`passive-loop-${triggerId}`);
+                if (checkbox) checkbox.checked = false;
+                return;
+            }
+
+            trigger.loop = loopValue;
             renderPassiveTriggers();
         }
         
@@ -2205,11 +2521,25 @@
             }
             renderHidOutput();
 
+            // Mouse Outputs
+            Object.entries(configData.outputs)
+                .filter(([key, val]) => val.type === 'mouse')
+                .forEach(([key, output]) => {
+                    renderMouseOutput(key, output);
+                });
+
             // GPIO Outputs
             Object.entries(configData.outputs)
                 .filter(([key, val]) => val.type === 'gpio')
                 .forEach(([key, output]) => {
                     renderGpioOutput(key, output);
+                });
+
+            // Serial Outputs
+            Object.entries(configData.outputs)
+                .filter(([key, val]) => val.type === 'serial')
+                .forEach(([key, output]) => {
+                    renderSerialOutput(key, output);
                 });
         }
 
@@ -2322,6 +2652,67 @@
             container.appendChild(card);
         }
 
+        function renderSerialOutput(name, cfg) {
+            const container = document.getElementById('outputs-config-container');
+            if (!container) return;
+            if (!configData || !cfg) return;
+
+            const card = document.createElement('div');
+            card.className = 'output-card';
+            card.innerHTML = `
+                <div class="output-card-header">
+                    <span>🔗 <span class="output-name-display">${name}</span></span>
+                    <span class="output-type-badge badge-gpio">SERIAL</span>
+                </div>
+                <p class="output-description">Sends events or raw text over the second USB serial (CDC data) port to a listener script on the host.</p>
+                <div class="checkbox-group">
+                    <input type="checkbox" ${cfg.enabled ? 'checked' : ''}
+                        onchange="updateOutputField('${name}', 'enabled', this.checked)">
+                    <label style="display: flex; align-items: center;">
+                        Enabled
+                        <span class="tooltip-icon" data-tip="If disabled, this output will not fire even if triggered">?</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Label (description)</label>
+                    <input type="text" value="${cfg.label || ''}" placeholder="e.g., Host event channel"
+                        onchange="updateOutputField('${name}', 'label', this.value)">
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="deleteSerialOutput('${name}')" style="width:100%; margin-top: 12px;">
+                    🗑️ Delete Output
+                </button>
+            `;
+            container.appendChild(card);
+        }
+
+        function renderMouseOutput(name, cfg) {
+            const container = document.getElementById('outputs-config-container');
+            if (!container) return;
+            if (!configData || !cfg) return;
+
+            const card = document.createElement('div');
+            card.className = 'output-card';
+            card.innerHTML = `
+                <div class="output-card-header">
+                    <span>🖱️ <span class="output-name-display">${name}</span></span>
+                    <span class="output-type-badge badge-mouse">MOUSE</span>
+                </div>
+                <p class="output-description">Emulates USB HID mouse (move/click/press/release). Used by TrackballInput via execute_output().</p>
+                <div class="checkbox-group">
+                    <input type="checkbox" ${cfg.enabled ? 'checked' : ''}
+                        onchange="updateOutputField('${name}', 'enabled', this.checked)">
+                    <label style="display: flex; align-items: center;">
+                        Enabled
+                        <span class="tooltip-icon" data-tip="If disabled, mouse output will not respond to trackball movements">?</span>
+                    </label>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="deleteMouseOutput('${name}')" style="width:100%; margin-top: 12px;">
+                    🗑️ Delete Output
+                </button>
+            `;
+            container.appendChild(card);
+        }
+
         function addGpioOutput() {
             if (!configData || !configData.outputs || !configData.scenarios) return;
             
@@ -2363,6 +2754,56 @@
             renderScenariosList();
         }
 
+        function addMouseOutput() {
+            if (!configData || !configData.outputs) return;
+
+            const name = prompt('Enter output name (lowercase, underscores allowed):\ne.g., mouse, mouse_2');
+            if (!name) return;
+
+            if (!/^[a-z0-9_]+$/.test(name)) {
+                alert('❌ Invalid name! Use only lowercase letters, numbers, and underscores.');
+                return;
+            }
+
+            if (configData.outputs[name]) {
+                alert('❌ Output with this name already exists!');
+                return;
+            }
+
+            configData.outputs[name] = {
+                type: 'mouse',
+                enabled: true
+            };
+
+            renderOutputsConfig();
+        }
+
+        function addSerialOutput() {
+            if (!configData || !configData.outputs) return;
+
+            const name = prompt('Enter output name (lowercase, underscores allowed):\ne.g., serial, host_events');
+            if (!name) return;
+
+            if (!/^[a-z0-9_]+$/.test(name)) {
+                alert('❌ Invalid name! Use only lowercase letters, numbers, and underscores.');
+                return;
+            }
+
+            if (configData.outputs[name]) {
+                alert('❌ Output with this name already exists!');
+                return;
+            }
+
+            configData.outputs[name] = {
+                type: 'serial',
+                enabled: true,
+                label: 'New Serial Output'
+            };
+
+            renderOutputsConfig();
+            renderScenariosList();
+        }
+
         function deleteGpioOutput(name) {
             if (!configData || !configData.outputs || !configData.scenarios) return;
             
@@ -2387,6 +2828,32 @@
                 delete configData.scenarios[defaultScenario];
             }
             
+            renderOutputsConfig();
+            renderScenariosList();
+        }
+
+        function deleteSerialOutput(name) {
+            if (!configData || !configData.outputs) return;
+
+            if (!confirm(`Delete Serial output "${name}"?\n\nThis will remove it from scenarios that use it.`)) {
+                return;
+            }
+
+            delete configData.outputs[name];
+
+            renderOutputsConfig();
+            renderScenariosList();
+        }
+
+        function deleteMouseOutput(name) {
+            if (!configData || !configData.outputs) return;
+
+            if (!confirm(`Delete Mouse output "${name}"?\n\nAny TrackballInput referencing this output ("output": "${name}") will silently fail to move the cursor until repointed.`)) {
+                return;
+            }
+
+            delete configData.outputs[name];
+
             renderOutputsConfig();
             renderScenariosList();
         }
@@ -2420,8 +2887,8 @@
             if (!configData || !configData.outputs || !configData.outputs[outputName]) return;
             configData.outputs[outputName][field] = value;
             
-            // If enabled flag changed on GPIO output → re-render outputs
-            if (field === 'enabled' && configData.outputs[outputName].type === 'gpio') {
+            // If enabled flag changed on GPIO or Serial output → re-render outputs
+            if (field === 'enabled' && (configData.outputs[outputName].type === 'gpio' || configData.outputs[outputName].type === 'serial')) {
                 renderOutputsConfig();
             }
         }
@@ -2505,6 +2972,7 @@
                 });
 
             console.log('✓ Outputs configuration serialized to configData');
+            updateRawJsonIfVisible();
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -3220,12 +3688,12 @@
             // Update "Add scenario" button state based on loop and pipeline length
             const addButton = document.querySelector('#inspector-edit-panel button[onclick="addPipelineEntry()"]');
             if (addButton) {
-                // If loop: false and pipeline has at least one scenario → disable Add button
-                const shouldDisable = !item.loop && item.pipeline.length > 0;
+                // Loop mode allows at most 2 scenarios (binary toggle, e.g. Start/Stop)
+                const shouldDisable = item.loop && item.pipeline.length >= 2;
                 addButton.disabled = shouldDisable;
                 addButton.style.opacity = shouldDisable ? '0.5' : '1';
                 addButton.style.cursor = shouldDisable ? 'not-allowed' : 'pointer';
-                addButton.title = shouldDisable ? 'Cannot add more scenarios when Loop is OFF (only one scenario allowed)' : '';
+                addButton.title = shouldDisable ? 'Loop mode allows at most 2 scenarios (e.g. Start/Stop toggle)' : '';
             }
 
             // Update hint visibility
@@ -3317,7 +3785,17 @@
         
         function updateInspectedItemLoop(loopValue) {
             if (!selectedItemRef) return;
-            selectedItemRef.item.loop = loopValue;
+
+            const item = selectedItemRef.item;
+
+            if (loopValue && item.pipeline.length > 2) {
+                alert('❌ Cannot turn Loop ON while more than 2 scenarios are in the pipeline.\n\nLoop mode cycles between exactly 2 scenarios (e.g. Start/Stop). Delete extra scenarios first (leave at most 2), then turn Loop on.');
+                const checkbox = document.getElementById('inspect-loop-mode');
+                if (checkbox) checkbox.checked = false;
+                return;
+            }
+
+            item.loop = loopValue;
             renderInspectorSequence(); // refresh hint
             saveAndSyncMenu();
         }
@@ -3717,6 +4195,19 @@
                     { type: 'gpio_toggle', label: 'GPIO Toggle', hidAction: false, tooltip: 'Flips the GPIO pin state: HIGH→LOW or LOW→HIGH' }
                     // Note: No 'wait' - GPIO actions are atomic with timing as parameters
                 ],
+                mouse: [
+                    { type: 'move', label: 'Mouse Move', hidAction: false, tooltip: 'Смещает курсор мыши на относительные X/Y пиксели' },
+                    { type: 'click', label: 'Mouse Click', hidAction: false, tooltip: 'Клик указанной кнопкой (left/right/middle)' },
+                    { type: 'press', label: 'Mouse Press', hidAction: false, tooltip: 'Зажимает указанную кнопку мыши' },
+                    { type: 'release', label: 'Mouse Release', hidAction: false, tooltip: 'Отпускает указанную кнопку мыши' },
+                    { type: 'wait', label: 'Wait MS', hidAction: false, tooltip: 'Пауза пайплайна на заданное количество миллисекунд' }
+                ],
+                serial: [
+                    { type: 'send', label: 'Send text', hidAction: false, tooltip: 'Sends a raw string over the serial data port as-is, with no newline' },
+                    { type: 'send_line', label: 'Send line', hidAction: false, tooltip: 'Sends a string over the serial data port followed by a newline character' },
+                    { type: 'event', label: 'Send event (JSON)', hidAction: false, tooltip: 'Sends a structured JSON event {event, uptime, ...data} followed by a newline' },
+                    { type: 'wait', label: 'Wait MS', hidAction: false, tooltip: 'Pauses the pipeline for a specified duration in milliseconds' }
+                ],
                 mixed: [
                     { type: 'type', label: 'Type text', hidAction: true, tooltip: 'Sends a keystroke or key combination to the host. Example: ctrl+alt+t' },
                     { type: 'key', label: 'KeyPress combo', hidAction: true, tooltip: 'Sends a keystroke or key combination to the host. Example: ctrl+alt+t' },
@@ -3831,12 +4322,29 @@
                 optionsHtml += '<option value="hid">HID (Keyboard/Mouse)</option>';
             }
             
+            // Add all enabled Mouse outputs
+            Object.keys(configData.outputs).forEach(outputName => {
+                const output = configData.outputs[outputName];
+                if (output.type === 'mouse' && output.enabled) {
+                    optionsHtml += `<option value="${outputName}">MOUSE: ${outputName}</option>`;
+                }
+            });
+            
             // Add all enabled GPIO outputs
             Object.keys(configData.outputs).forEach(outputName => {
                 const output = configData.outputs[outputName];
                 if (output.type === 'gpio' && output.enabled) {
                     const label = output.label || outputName;
                     optionsHtml += `<option value="${outputName}">GPIO: ${label} (${outputName})</option>`;
+                }
+            });
+
+            // Add all enabled Serial outputs
+            Object.keys(configData.outputs).forEach(outputName => {
+                const output = configData.outputs[outputName];
+                if (output.type === 'serial' && output.enabled) {
+                    const label = output.label || outputName;
+                    optionsHtml += `<option value="${outputName}">SERIAL: ${label} (${outputName})</option>`;
                 }
             });
             
@@ -3862,6 +4370,12 @@
             if (selectedOutput === 'hid') {
                 // Create default HID step (type text)
                 firstStep = { output: 'hid', action: 'type', value: '' };
+            } else if (configData.outputs[selectedOutput] && configData.outputs[selectedOutput].type === 'mouse') {
+                // Create default Mouse step (move)
+                firstStep = { output: selectedOutput, action: 'move', x: 0, y: 0 };
+            } else if (configData.outputs[selectedOutput] && configData.outputs[selectedOutput].type === 'serial') {
+                // Create default Serial step (send_line)
+                firstStep = { output: selectedOutput, action: 'send_line', value: '' };
             } else {
                 // Create default GPIO step (pulse)
                 firstStep = { output: selectedOutput, action: 'gpio_pulse' };
@@ -4270,6 +4784,89 @@
                 info.textContent = 'Toggles GPIO pin state';
                 fieldsDiv.appendChild(info);
             }
+            // ═══ SERIAL ACTIONS ═══
+            else if (stepAction === 'send' || stepAction === 'send_line') {
+                const formGroup = document.createElement('div');
+                formGroup.className = 'form-group';
+                formGroup.style.flex = '1';
+
+                const label = document.createElement('label');
+                label.textContent = 'Value';
+                label.style.fontSize = '0.7rem';
+                label.style.marginBottom = '2px';
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = step.value || '';
+                input.placeholder = stepAction === 'send_line' ? 'Text to send (newline added automatically)' : 'Raw text to send';
+                input.oninput = function() { updateStepValue(idx, 'value', this.value); };
+                input.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'value', this.value);
+                        this.blur();
+                    }
+                };
+
+                formGroup.appendChild(label);
+                formGroup.appendChild(input);
+                fieldsDiv.appendChild(formGroup);
+            }
+            else if (stepAction === 'event') {
+                const nameGroup = document.createElement('div');
+                nameGroup.className = 'form-group';
+                nameGroup.style.flex = '1';
+
+                const nameLabel = document.createElement('label');
+                nameLabel.textContent = 'Event name';
+                nameLabel.style.fontSize = '0.7rem';
+                nameLabel.style.marginBottom = '2px';
+
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.value = step.name || '';
+                nameInput.placeholder = 'e.g. poweroff, button_pressed';
+                nameInput.oninput = function() { updateStepValue(idx, 'name', this.value); };
+                nameInput.onkeydown = function(event) {
+                    if(event.key === 'Enter') {
+                        updateStepValue(idx, 'name', this.value);
+                        this.blur();
+                    }
+                };
+
+                nameGroup.appendChild(nameLabel);
+                nameGroup.appendChild(nameInput);
+                fieldsDiv.appendChild(nameGroup);
+
+                const dataGroup = document.createElement('div');
+                dataGroup.className = 'form-group';
+                dataGroup.style.flex = '1';
+
+                const dataLabel = document.createElement('label');
+                dataLabel.textContent = 'Extra data (JSON object)';
+                dataLabel.style.fontSize = '0.7rem';
+                dataLabel.style.marginBottom = '2px';
+
+                const dataInput = document.createElement('textarea');
+                dataInput.rows = 2;
+                dataInput.style.fontFamily = 'var(--font-mono)';
+                dataInput.style.fontSize = '0.8rem';
+                dataInput.value = step.data ? JSON.stringify(step.data) : '{}';
+                dataInput.placeholder = '{"key": "value"}';
+                dataInput.onchange = function() {
+                    try {
+                        const parsed = JSON.parse(this.value || '{}');
+                        updateStepValue(idx, 'data', parsed);
+                        this.style.borderColor = '';
+                    } catch (e) {
+                        this.style.borderColor = 'var(--accent-red)';
+                        alert('Invalid JSON in Extra data field — change was not saved.');
+                    }
+                };
+
+                dataGroup.appendChild(dataLabel);
+                dataGroup.appendChild(dataInput);
+                fieldsDiv.appendChild(dataGroup);
+            }
 
             // Create delete button
             const deleteBtn = document.createElement('button');
@@ -4360,6 +4957,23 @@
                     configData.outputs[name].type === 'gpio'
                 ) || 'gpio_out';
                 newStep = { output: gpioOutput, action: type };
+            }
+            // Serial actions
+            else if (type === 'send') {
+                const serialOutput = Object.keys(configData.outputs).find(name => 
+                    configData.outputs[name].type === 'serial'
+                ) || 'serial';
+                newStep = { output: serialOutput, action: type, value: '' };
+            } else if (type === 'send_line') {
+                const serialOutput = Object.keys(configData.outputs).find(name => 
+                    configData.outputs[name].type === 'serial'
+                ) || 'serial';
+                newStep = { output: serialOutput, action: type, value: '' };
+            } else if (type === 'event') {
+                const serialOutput = Object.keys(configData.outputs).find(name => 
+                    configData.outputs[name].type === 'serial'
+                ) || 'serial';
+                newStep = { output: serialOutput, action: type, name: '', data: {} };
             }
             // Wait (universal)
             else if (type === 'wait') {
@@ -4462,5 +5076,48 @@
 
     <!-- Global tooltip container -->
     <div id="global-tooltip"></div>
+</body>
+</html>
+
+<script>
+// ============================================
+// Zoom Control: -4 to +4 (0 = default 100%)
+// -4=0.5x, -3=0.625x, -2=0.75x, -1=0.875x, 0=1x, +1=1.125x, +2=1.25x, +3=1.5x, +4=2x
+// ============================================
+let currentZoomIndex = 4; // Start at 0 (index 4 in array)
+const zoomSteps = [
+    { label: '-4', scale: 0.5 },
+    { label: '-3', scale: 0.625 },
+    { label: '-2', scale: 0.75 },
+    { label: '-1', scale: 0.875 },
+    { label: '0', scale: 1.0 },      // Default
+    { label: '+1', scale: 1.125 },
+    { label: '+2', scale: 1.25 },
+    { label: '+3', scale: 1.5 },
+    { label: '+4', scale: 2.0 }
+];
+
+function cycleZoom() {
+    currentZoomIndex = (currentZoomIndex + 1) % zoomSteps.length;
+    const step = zoomSteps[currentZoomIndex];
+    
+    // Apply zoom to body
+    document.body.style.zoom = step.scale;
+    
+    // Update button text
+    const btn = document.getElementById('zoom-btn');
+    btn.textContent = step.label;
+    
+    console.log('Zoom: ' + step.label + ' (' + (step.scale * 100) + '%)');
+}
+
+// Initialize zoom on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.body.style.zoom = 1;
+    document.getElementById('zoom-btn').textContent = '0';
+});
+</script>
+
+
 </body>
 </html>
