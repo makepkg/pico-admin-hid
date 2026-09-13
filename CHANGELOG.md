@@ -7,6 +7,23 @@ and this project uses Semantic Versioning-like numbering.
 
 ---
 
+## [2.2.0]
+
+### Added
+
+- **Mouse output handler** (`output_mouse.py`): Adds mouse movement and button click emulation to the output pipeline.
+- **Serial output handler** (`output_serial.py`): Support for sending custom string payloads via USB Serial interface.
+- **Host listener utility** (`pico-host/serial_listener_simple.py`): Lightweight serial listener script for processing incoming host events.
+- Developer documentation for new inputs (`docs/developers/inputs.md`) and outputs (`docs/developers/outputs.md`).
+
+### Changed
+
+- **Web Config Studio** (`editor.html`): Major UI redesign and visual editor updates for pipeline and device configuration.
+- **Inputs Manager** (`inputs_manager.py`): Extended input handling architecture and state management logic.
+- Updated configuration schemas (`config.py`, `config.json`) to support mouse and serial output parameters.
+
+---
+
 ## [2.1.0] — Power Monitor State Machine Refactor
 
 ### Changed
@@ -114,3 +131,20 @@ Major architectural refactoring to support extensible typed inputs and outputs w
 ## Maintaining this changelog
 
 When making significant changes (new input/output types, config schema modifications, breaking pipeline changes, or new hardware features), add an entry here **before** the release, not post-factum. Group changes under appropriate categories: Added, Changed, Deprecated, Removed, Fixed, or Security.
+
+## [Unreleased]
+### Changed files:
+ CHANGELOG.md               |   3 +
+ README.md                  |   2 +-
+ boot.py                    |   5 +-
+ code.py                    |  44 ++-
+ config.json                |  35 +-
+ config.py                  |  62 ++++
+ display.py                 |  92 ++---
+ docs/developers/inputs.md  |  20 ++
+ docs/developers/outputs.md |  69 +++-
+ editor.html                | 839 ++++++++++++++++++++++++++++++++++++++++-----
+ inputs_manager.py          | 158 ++++++++-
+ screensaver.py             |   8 +-
+ trigger_bus.py             |  14 +-
+ 13 files changed, 1193 insertions(+), 158 deletions(-)
