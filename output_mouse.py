@@ -83,6 +83,11 @@ class MouseOutput(OutputHandler):
                 self._mouse.release(b)
                 return True
 
+            elif act == "scroll":
+                wheel = action.get("wheel", 0)
+                self._mouse.move(wheel=wheel)
+                return True
+
             else:
                 print(f"[output:{self.name}] Unknown mouse action: {act}")
                 return False

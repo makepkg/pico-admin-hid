@@ -42,6 +42,9 @@ current_menu_list = root_menu
 # Стек для навигации назад: хранит кортежи (список_родителя, позиция_курсора)
 menu_stack = []
 
+# Encoder Control: активный item в режиме прямого управления (None = обычная навигация)
+encoder_control_item = None
+
 # Защита от выхода за пределы (если конфиг урезали после сохранения позиции)
 if root_menu and menu_cursor >= len(root_menu):
     menu_cursor = 0
@@ -61,6 +64,7 @@ if config.get_config().get("device", {}).get("display_enabled", True):
     try:
         display = DisplayManager()
         display.show_boot()
+        display.set_render_mode(config.get_config().get("device", {}).get("display_mode", "text"))
     except Exception as e:
         print("[main] Display init failed:", e)
         display = None
@@ -102,6 +106,9 @@ def get_current_action():
     if not current_menu_list:
         return ""
     item = current_menu_list[menu_cursor]
+    # Encoder Control — не папка и не обычное действие, свой индикатор
+    if item.get("type") == "encoder_control":
+        return ">> Encoder"
     # Папка без sequence — показываем индикатор вложенного меню
     if "sequence" not in item and "pipeline" not in item:
         return ">> Open"
@@ -111,6 +118,7 @@ def get_current_action():
 def refresh_menu():
     """Перерисовать меню без анимации."""
     if display and current_menu_list:
+        display.set_menu_state(menu_cursor, len(current_menu_list), len(menu_stack))
         display.draw_menu(get_current_label(), get_current_action())
 
 
@@ -137,7 +145,7 @@ next_anim_t = 0.0
 
 def wake_up_display():
     """Пробуждение экрана из любого режима ожидания."""
-    global last_interaction_time, screen_sleeping, screensaver_active
+    global last_interaction_time, screen_sleeping, screensaver_active, encoder_control_item
     last_interaction_time = time.monotonic()
     if display:
         # Если сплеш активен — он сам восстановит root_group, форсируем hide
@@ -150,18 +158,77 @@ def wake_up_display():
         if screen_sleeping:
             display.wake()
             screen_sleeping = False
-        refresh_menu()
+        if encoder_control_item is not None:
+            _enter_encoder_control_display(encoder_control_item)
+        else:
+            refresh_menu()
     print("[main] Display awake")
 
 
 # ── 5. Callback энкодера ───────────────────────────────────────────────────
+
+def _enter_encoder_control_display(item):
+    """Отрисовка фонового вида режима Encoder Control."""
+    if display:
+        mode_label = item.get("label", "?")
+        output_mode = item.get("output_mode", "?")
+        mode_type = "Mouse" if output_mode == "mouse" else "Scenario"
+        display.show_encoder_control(mode_label, mode_type)
+
+
+def _handle_encoder_control_event(event):
+    """Маршрутизация событий энкодера внутри активного режима Encoder Control."""
+    global encoder_control_item
+    item = encoder_control_item
+    if item is None:
+        return
+
+    if event == EV_LONG_PRESS:
+        encoder_control_item = None
+        refresh_menu()
+        return
+
+    output_mode = item.get("output_mode")
+
+    if output_mode == "mouse":
+        if event == EV_ROTATE_RIGHT:
+            trigger_bus.execute_output("mouse", {"action": "scroll", "wheel": 3})
+        elif event == EV_ROTATE_LEFT:
+            trigger_bus.execute_output("mouse", {"action": "scroll", "wheel": -3})
+        elif event == EV_PRESS:
+            trigger_bus.execute_output("mouse", {"action": "click", "button": "right"})
+
+    elif output_mode == "scenario":
+        pipeline = None
+        if event == EV_ROTATE_RIGHT:
+            pipeline = item.get("on_rotate_right")
+        elif event == EV_ROTATE_LEFT:
+            pipeline = item.get("on_rotate_left")
+        elif event == EV_PRESS:
+            pipeline = item.get("on_click")
+
+        if pipeline:
+            if display:
+                event_label = {
+                    EV_ROTATE_RIGHT: "-> Right",
+                    EV_ROTATE_LEFT: "-> Left",
+                    EV_PRESS: "-> Click",
+                }.get(event, "")
+                display.show_executing(item.get("label", "?"), event_label)
+            trigger_id = "encoder_ctrl_" + str(item.get("id", "?")) + "_" + str(event)
+            trigger_bus.execute_pipeline(
+                {"pipeline": pipeline, "loop": False},
+                trigger_id,
+                trigger_bus.PRIORITY_HIGH
+            )
+
 
 def on_encoder_event(event):
     """
     Вызывается из encoder.update() при каждом событии.
     Синхронный вызов — не делать тут долгих операций.
     """
-    global menu_cursor, current_menu_list, last_interaction_time, screen_sleeping, screensaver_active
+    global menu_cursor, current_menu_list, last_interaction_time, screen_sleeping, screensaver_active, encoder_control_item
 
     # ── Warning screen interception ───────────────────────────────────
     if warning_screen and warning_screen.is_active:
@@ -186,23 +253,45 @@ def on_encoder_event(event):
     # Сбрасываем таймер активности
     last_interaction_time = time.monotonic()
 
+    # Encoder Control: пока режим активен, события маршрутизируются
+    # отдельно и не попадают в обычную навигацию по меню
+    if encoder_control_item is not None:
+        _handle_encoder_control_event(event)
+        return
+
     if event == EV_ROTATE_RIGHT:
         if not current_menu_list:
             return
+        
+        # Проверка упора для геометрического корневого меню
+        if display and len(menu_stack) == 0 and display.is_geometric():
+            if menu_cursor >= len(current_menu_list) - 1:
+                display.bump("right")
+                return
+        
         old_label   = get_current_label()
         menu_cursor = (menu_cursor + 1) % len(current_menu_list)
         new_label   = get_current_label()
         if display:
+            display.set_menu_state(menu_cursor, len(current_menu_list), len(menu_stack))
             display.animate_swipe(old_label, new_label, direction="right")
             display.draw_menu(new_label, get_current_action())
 
     elif event == EV_ROTATE_LEFT:
         if not current_menu_list:
             return
+        
+        # Проверка упора для геометрического корневого меню
+        if display and len(menu_stack) == 0 and display.is_geometric():
+            if menu_cursor <= 0:
+                display.bump("left")
+                return
+        
         old_label   = get_current_label()
         menu_cursor = (menu_cursor - 1) % len(current_menu_list)
         new_label   = get_current_label()
         if display:
+            display.set_menu_state(menu_cursor, len(current_menu_list), len(menu_stack))
             display.animate_swipe(old_label, new_label, direction="left")
             display.draw_menu(new_label, get_current_action())
 
@@ -214,7 +303,7 @@ def on_encoder_event(event):
         item_id = item["id"]
         lbl     = item.get("label", "?")
 
-        # 1. Если есть sequence или pipeline — выполняем команду
+        # 1. Если есть sequence или pipeline — выполняем команду (entry-action)
         if "sequence" in item or "pipeline" in item:
             action = get_current_action()
             if display:
@@ -226,6 +315,13 @@ def on_encoder_event(event):
             menu_stack.append((current_menu_list, menu_cursor))
             current_menu_list = item["submenu"]
             menu_cursor = 0
+
+        # 3. Encoder Control — активируем режим прямого управления
+        #    (НЕ спуск по menu_stack, current_menu_list/menu_cursor не трогаем)
+        if item.get("type") == "encoder_control":
+            encoder_control_item = item
+            _enter_encoder_control_display(item)
+            return
 
         # Обновляем экран
         refresh_menu()
@@ -324,7 +420,7 @@ while True:
     # Таймер автовыключения / заставки экрана
     now = time.monotonic()
     if screen_timeout > 0 and (now - last_interaction_time) > screen_timeout:
-        if not screen_sleeping and not screensaver_active:
+        if not screen_sleeping and not screensaver_active and not (splash_screen and splash_screen.is_active):
             if screensaver_name == "off":
                 if display:
                     display.sleep()

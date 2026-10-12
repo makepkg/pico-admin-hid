@@ -92,7 +92,7 @@ See [Pipelines Guide](docs/user/pipelines.md) for how Input → Pipeline → Out
 - **Action Sequences** — Toggle services (start/stop) with single click
 - **Emergency Triggers** — Hall sensor activation for critical scenarios
 - **Battery Monitoring** — INA226-based voltage/current tracking with configurable low-battery warnings and screensaver notifications
-- **Screen Management** — Auto-sleep and customizable screensavers (Tesseract, Starfield, Matrix)
+- **Screen Management** — Auto-sleep, customizable screensavers (Tesseract, Starfield, Matrix), and geometric menu render mode (shape-based navigation)
 - **State Persistence** — Remembers menu position and sequence states
 
 ### 🛡️ Safety & Reliability

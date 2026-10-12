@@ -133,6 +133,11 @@ One click executes the **entire** pipeline of scenarios sequentially at once. Th
 - Both `pipeline` AND `submenu`
 - `code.py` checks both independently: it will execute the pipeline scenarios first, then navigate into the folder.
 
+**4. Encoder Control Items**
+- Contain `"type": "encoder_control"` and `output_mode` (`"mouse"` or `"scenario"`)
+- On click, the encoder switches from menu navigation into a direct-control mode instead of opening a submenu or firing a pipeline in the usual sense
+- See [Encoder Control Mode](#encoder-control-mode) below for the full behavior
+
 ### Menu Configuration
 
 ```json
@@ -196,6 +201,106 @@ current_menu_list, menu_cursor = menu_stack.pop()
 
 ---
 
+## Encoder Control Mode
+
+Encoder Control is a fourth menu item type (`"type": "encoder_control"`) that temporarily repurposes the encoder from menu navigation into a direct-input device — a scroll wheel, a pointer button, or a trigger for arbitrary scenarios on rotation/click — without leaving the menu hierarchy.
+
+### Why It Exists
+
+Normal menu items require entering a submenu and clicking a specific entry for each action. For continuous or repetitive interactions — scrolling a page, paging through something with arrow keys — that's unnecessary friction. Encoder Control turns rotation itself into the action.
+
+### Configuration
+
+```json
+{
+  "id": "browser_scroll",
+  "label": "Browser Scroll",
+  "type": "encoder_control",
+  "output_mode": "mouse"
+}
+```
+
+```json
+{
+  "id": "video_control",
+  "label": "Video Control",
+  "type": "encoder_control",
+  "output_mode": "scenario",
+  "on_rotate_right": ["scenario_arrow_right"],
+  "on_rotate_left": ["scenario_arrow_left", "scenario_show_osd"],
+  "on_click": ["scenario_pause"]
+}
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | string | Yes | Must be `"encoder_control"` |
+| `output_mode` | string | Yes | `"mouse"` or `"scenario"` |
+| `pipeline` | array | No | Optional entry-action, executed once on click before the mode activates. Uses the standard pipeline mechanism (see [Pipeline System](#pipeline-system)) but is always treated as `loop: false` regardless of the `loop` value in config. |
+| `on_rotate_right` | array of scenario names | Only if `output_mode: "scenario"` | Scenarios run on clockwise rotation |
+| `on_rotate_left` | array of scenario names | Only if `output_mode: "scenario"` | Scenarios run on counter-clockwise rotation |
+| `on_click` | array of scenario names | Only if `output_mode: "scenario"` | Scenarios run on short click |
+
+Unlike `active_menu[].pipeline`, the three `on_rotate_*`/`on_click` fields are plain arrays of scenario names — not `{"scenario": ..., "label": ...}` objects — because the on-screen label during execution is always the fixed event name (`-> Right` / `-> Left` / `-> Click`), not a per-entry label.
+
+### Entering and Exiting
+
+Entering does **not** push onto the navigation stack the way a folder does:
+
+```python
+# On EV_PRESS for an encoder_control item:
+if item.get("type") == "encoder_control":
+    encoder_control_item = item
+    _enter_encoder_control_display(item)
+    return
+# current_menu_list / menu_cursor / menu_stack are left untouched
+```
+
+Because the cursor position is never moved, exiting (long press) requires no stack `pop()` — `refresh_menu()` simply redraws whatever `current_menu_list[menu_cursor]` already was, which is the parent item the user entered from.
+
+### `output_mode: "mouse"` — Direct Output
+
+Fixed, non-configurable mapping, dispatched through `trigger_bus.execute_output("mouse", ...)` — the same direct-call path used by `TrackballInput` (see [Outputs Guide — Direct-Call Pattern](outputs.md#direct-call-pattern-trackball-input)). This bypasses cooldown and the busy/priority queue entirely, because it never goes through `execute_pipeline()`.
+
+| Event | Action |
+|---|---|
+| Rotate right | `{"action": "scroll", "wheel": 3}` |
+| Rotate left | `{"action": "scroll", "wheel": -3}` |
+| Click | `{"action": "click", "button": "right"}` |
+
+There is no configuration for direction, step size, or button — this mode is intentionally hardcoded for minimal latency and minimal surface area. If a different button or step is needed, use `output_mode: "scenario"` instead.
+
+### `output_mode: "scenario"` — Pipeline Output
+
+Each event independently calls `execute_pipeline()` directly (not through `fire_active()`, since there is no `submenu`-aware item lookup needed here):
+
+```python
+trigger_bus.execute_pipeline(
+    {"pipeline": item["on_rotate_right"], "loop": False},
+    trigger_id=f"encoder_ctrl_{item['id']}_{event}",
+    priority=trigger_bus.PRIORITY_HIGH
+)
+```
+
+`loop` is always forced to `False` — looping has no meaning for a per-event trigger. `PRIORITY_HIGH` is used to bypass the standard cooldown, following the same precedent already established for `TrackballInput` in `click_mode: "scenario"` (see [Passive Trigger System](passive-triggers.md)) — frequent, user-driven interactions are an accepted use of `PRIORITY_HIGH`, not only hardware emergencies. The busy flag still applies: if a pipeline from one event is still executing, a rapid second rotation is dropped rather than queued.
+
+**Keep these pipelines short.** `execute_pipeline()` runs synchronously in the main loop; a `wait` step inside it blocks `inputs.update()` for its duration, which means Hall sensor and power-monitor polling pause too. This is an existing system-wide property (any executing pipeline has always blocked input polling), but Encoder Control makes it easy to trigger repeatedly in quick succession. For continuous, high-frequency interaction, prefer `output_mode: "mouse"` instead — `execute_output()` never blocks the main loop.
+
+### Display Feedback
+
+- **On entry** (and again on wake from screen sleep/screensaver, if the mode is still active): `display.show_encoder_control(label, mode_type)` shows the item's label and `"Mouse"` or `"Scenario"`.
+- **`output_mode: "scenario"`, per event**: `display.show_executing(label, event_label)` — reuses the same call used by ordinary menu actions, so it shows for exactly as long as the triggered pipeline actually takes to run.
+- **`output_mode: "mouse"`**: no per-event indicator. The effect (an actual scroll, an actual click) is immediately visible on the host, and adding a transient on-screen indicator here would require the mode's execution path to touch the main loop's timing — an explicit, deliberate tradeoff **not** implemented.
+- A pending caveat: the `show_executing()` text in scenario mode does not auto-clear back to the mode's background view after the pipeline finishes — it holds until the next event. Cosmetic only.
+
+### Known Constraints
+
+- No `submenu`: `encoder_control` items cannot contain child items. Converting an existing folder with items into `encoder_control` (via the Config Studio inspector) requires confirming deletion of its contents, the same confirmation already used for folder→action conversion.
+- No `loop: true` anywhere in this item type — neither on the optional entry `pipeline`, nor on `on_rotate_*`/`on_click`.
+- Mouse mode's button/direction/step are not configurable, by design.
+
+---
+
 ## Encoder Events
 
 ### Event Types
@@ -218,6 +323,8 @@ def on_encoder_event(event):
     
     if event == EV_ROTATE_RIGHT:
         menu_cursor = (menu_cursor + 1) % len(current_menu_list)
+        # Pass menu state to display for geometric render mode
+        display.set_menu_state(menu_cursor, len(current_menu_list), len(menu_stack))
         display.animate_swipe(old_label, new_label, "right")
         save_cursor()
     

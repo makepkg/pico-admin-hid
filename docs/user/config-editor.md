@@ -56,7 +56,7 @@ The Config Studio (`editor.html`) is a web-based graphical editor for managing P
 ### Left Sidebar (5 Sections)
 
 1. **Device Configuration**
-   - Global settings: Armed state, Debounce (ms), Cooldown (ms), Screen Timeout (s), Screensaver selection.
+   - Global settings: Armed state, Debounce (ms), Cooldown (ms), Screen Timeout (s), Screensaver selection, Display Render Mode.
 2. **Hardware Pins Configuration**
    - UI and system pins: Encoder (CLK, DT, SW), Button Pin, LED Pin, Display I2C (SDA, SCL).
 3. **Inputs**
@@ -93,7 +93,7 @@ Click any menu item to open the inspector on the right:
 |-------|-------------|----------|
 | **Item ID** | Unique identifier (use `a-z`, `0-9`, `_` only) | Yes |
 | **Display Label** | Text shown on OLED display (max 21 chars) | Yes |
-| **Item Type** | Radio toggle: Action or Folder | Yes |
+| **Item Type** | Radio toggle: Action, Folder, or Direct Control | Yes |
 
 ### Building Pipelines
 
@@ -120,9 +120,19 @@ Every pipeline has a **"Loop mode"** checkbox with a tooltip:
 
 ### Folders and Hybrid Items
 
-If an item is set to "Folder", the Inspector shows an **"Add inside this folder"** block with "+ Action" and "+ Folder" buttons. 
+If an item is set to "Folder", the Inspector shows an **"Add inside this folder"** block with "+ Action", "+ Folder", and "+ Direct Control" buttons.
 
 If an item has both a pipeline and sub-items, it acts as a **Hybrid Item**: clicking it will execute the pipeline and *then* open the folder.
+
+### Direct Control Items
+
+Set an item's type to "Direct Control" to turn it into an `encoder_control` item — a mode where rotating or clicking the physical encoder directly produces an effect, instead of navigating the menu.
+
+**Output Mode** (dropdown in the Inspector):
+- **Mouse** — fixed behavior: rotate = scroll, click = right-click. No further settings.
+- **Scenario** — reveals three scenario lists: **On Rotate Right**, **On Rotate Left**, **On Click**. Each works like a small pipeline builder (same "+ Add" / drag-to-reorder / delete pattern as elsewhere in the editor), but with no Loop mode checkbox and no per-entry label — these always run in sequence, once, on their triggering event.
+
+A Direct Control item has no "Add inside this folder" block and no `submenu` — it cannot contain other items. Converting an existing Folder with contents into Direct Control (via the Item Type radio) asks for confirmation, the same as converting Folder → Action.
 
 ---
 
@@ -265,6 +275,9 @@ The editor performs automatic validation when saving or switching tabs. Look for
 
 ## FAQ
 
+**Q: What is "Display Render Mode"?**  
+A: In the Device Configuration section (within Display & Encoder settings), you can choose between **Text (Classic)** and **Geometric (Shapes)**. Text mode shows menu items as labels. Geometric mode renders the root menu as shapes: 6 per page, with page 0 = squares, page 1 = triangles, page 2 = circles, page 3 = diamonds. Submenus remain text-based. This setting is stored as `device.display_mode` in `config.json`.
+
 **Q: Can I edit config.json directly instead of using the editor?**  
 A: Yes. The editor is a convenience tool. Manual JSON editing works perfectly, and the editor's Raw JSON tab makes this easy.
 
@@ -288,5 +301,5 @@ For issues, feature requests, or questions:
 
 ---
 
-**Last Updated**: 2026-06-24  
-**Compatible with Architecture**: Unified Pipeline, Inputs, and Outputs Engine
+**Last Updated**: 2026-10-06  
+**Compatible with Architecture**: Unified Pipeline, Inputs, and Outputs Engine, Encoder Control Mode

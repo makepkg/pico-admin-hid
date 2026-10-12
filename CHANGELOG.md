@@ -7,6 +7,26 @@ and this project uses Semantic Versioning-like numbering.
 
 ---
 
+## [2.3.0]
+
+### Added
+
+- **Geometric menu render mode**: New `device.display_mode` config option ("text" or "geometric"). Geometric mode displays the root menu as shapes instead of labels: 6 slots per page with forms rotating by page number (square, triangle, circle, diamond). Selected item is filled and larger (28px), others are outlined (16px). Features include time-based animations (grow/shrink 140ms, slide 180ms), non-circular navigation with bump animation at edges (6px push + spring back in 160ms, 2px wall indicator), and automatic fail-safe fallback to text mode on errors. Submenus and status screens remain text-based. Config Studio includes a "Display Render Mode" selector in Device Configuration section. Rendering optimized with `bitmaptools.fill_region` and single-refresh frames to minimize flicker.
+
+- **Encoder Control menu item type** (`"type": "encoder_control"`): a fourth `active_menu` item type that puts the encoder into a direct-input mode instead of navigating the menu. Two output modes:
+  - `output_mode: "mouse"` — fixed scroll (rotate) + right-click (press), dispatched directly through `trigger_bus.execute_output("mouse", ...)`, bypassing cooldown/busy, same pattern as `TrackballInput`.
+  - `output_mode: "scenario"` — `on_rotate_right`/`on_rotate_left`/`on_click` arrays of scenario names, each run via `execute_pipeline(..., priority=PRIORITY_HIGH)` with `loop` forced `False`.
+  - `scroll` action added to `output_mouse.py` (`{"action": "scroll", "wheel": N}`), using `adafruit_hid.mouse.Mouse.move(wheel=...)`.
+  - New `display.show_encoder_control()` method; `wake_up_display()` made mode-aware so it redraws the control view instead of the menu if the mode is still active on screen wake.
+  - Config Studio (`editor.html`): new "Direct Control" item type across all creation entry points (toolbar, context menu, folder "+" buttons), inspector panel with Mouse/Scenario toggle and three scenario-list editors (add/reorder/delete), tree badge, and two-way type-conversion field cleanup.
+  - Developer docs: [Encoder Control Mode](developers/active-triggers.md#encoder-control-mode). User docs: `active_menu` Item Types, new Mouse Output section, Config Studio Direct Control guide.
+
+### Fixed
+
+- `editor.html`: `serializeMenuTree()` did not recognize `"type": "encoder_control"` and silently downgraded such items to plain actions (losing `output_mode`/`on_rotate_*`/`on_click`) on any unrelated tree change that triggered `saveAndSyncMenu()` (20+ call sites — drag-and-drop, label edits, deleting any other item, etc.). Added an explicit `encoder_control` branch, checked before the folder/action branches.
+
+---
+
 ## [2.2.0]
 
 ### Added
@@ -132,7 +152,7 @@ Major architectural refactoring to support extensible typed inputs and outputs w
 
 When making significant changes (new input/output types, config schema modifications, breaking pipeline changes, or new hardware features), add an entry here **before** the release, not post-factum. Group changes under appropriate categories: Added, Changed, Deprecated, Removed, Fixed, or Security.
 
-## [Unreleased]
+## [Unreleased — previous]
 ### Changed files:
  CHANGELOG.md               |   3 +
  README.md                  |   2 +-

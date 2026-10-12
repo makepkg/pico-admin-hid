@@ -235,12 +235,41 @@ PRIORITY_HIGH   = 2  # Hall sensors (emergency) - bypasses cooldown
 
 ### 6. Display Manager (`display.py`)
 
-**Purpose**: OLED display driver with animations and screensavers.
+**Purpose**: OLED display driver with animations, screensavers, and multiple render modes.
+
+**Configuration**: Render mode is selected via `device.display_mode` ("text" or "geometric") in `config.json` and loaded in `code.py` through `display.set_render_mode()`.
 
 **Features**:
-- 128×32 SSD1306 OLED via I2C.
-- Swipe animations for menu transitions.
-- Screensaver support.
+- 128×32 SSD1306 OLED via I2C (400 kHz).
+- Two render modes: **text** (classic labels) and **geometric** (shape-based root menu).
+- Swipe animations for menu transitions (time-based, 140ms grow/shrink, 180ms slide).
+- Screensaver support (Tesseract, Starfield, Matrix).
+- Fail-safe: Automatic fallback to text mode on rendering exceptions.
+
+**Public API**:
+- `set_render_mode(mode)` — Set "text" or "geometric" mode.
+- `set_menu_state(cursor, total, depth)` — Update menu state before render (called by `code.py`).
+- `draw_menu(item_label, action_name)` — Render current menu item.
+- `animate_swipe(old_label, new_label, direction)` — Transition animation.
+- `is_geometric()` — Check if geometric mode is active.
+- `bump(direction)` — Edge bounce animation for geometric mode (160ms, 6px push with 2px wall).
+
+**Geometric Render Mode**:
+- Active only for root menu (`depth == 0`).
+- 6 slots per page, shape determined by `page % 4`: square, triangle, circle, diamond.
+- Selected item: filled, 28px. Unselected: outline, 16px.
+- Rendering: `displayio.Bitmap` + `displayio.Group`, uses `bitmaptools.fill_region` with pixel fallback.
+- Non-circular navigation: bump animation at edges instead of wraparound.
+- Auto-refresh disabled during frame assembly, single `refresh()` per frame.
+
+**Data Flow**:
+```
+code.py (encoder event) 
+  → display.set_menu_state(cursor, total, depth)
+  → display.animate_swipe() or display.draw_menu()
+  → _geo_active() checks mode & depth
+  → geometric render OR text render
+```
 
 ### 7. Encoder Handler (`encoder.py`)
 

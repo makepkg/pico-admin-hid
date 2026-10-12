@@ -1,353 +1,129 @@
 {
+  "hardware": {
+    "button_pin": 24,
+    "led_pin": 25,
+    "encoder_clk": 7,
+    "encoder_dt": 8,
+    "encoder_sw": 9,
+    "display_sda": 4,
+    "display_scl": 5
+  },
+  "device": {
+    "debounce_ms": 300,
+    "cooldown_ms": 5000,
+    "armed": false,
+    "screen_timeout_s": 15,
+    "screensaver": "off",
+    "display_enabled": false,
+    "encoder_enabled": true
+  },
   "inputs": {
-    "hall_sensor_1": {
-      "type": "hall",
-      "enabled": true,
-      "pin": 15,
-      "active_low": true
-    },
-    "hall_sensor_2": {
-      "type": "hall",
-      "enabled": true,
-      "pin": 16,
-      "active_low": true
-    },
-    "ina226": {
-      "type": "power_monitor",
-      "enabled": true,
-      "trigger_mode": "percent",
-      "threshold_percent": 15,
-      "threshold_voltage": 16.5,
-      "warning_offset_percent": 5,
-      "recovery_offset_percent": 10,
-      "trigger_attempts": 3,
-      "trigger_attempt_interval_sec": 60,
-      "read_interval_sec": 5.0,
-      "warning_enabled": true,
-      "warning_blink_interval": 0.5,
-      "warning_canceled_display_sec": 2.0,
-      "splash_interval_sec": 30,
-      "splash_duration_sec": 6,
-      "battery_max_v": 21.0,
-      "battery_min_v": 15.0,
-      "shunt_ohms": 0.1,
-      "i2c_scl": 5,
-      "i2c_sda": 4,
-      "i2c_address": 64
-    },
     "trackball_1": {
       "type": "trackball",
-      "enabled": true,
       "pin_up": 3,
       "pin_down": 4,
       "pin_left": 6,
       "pin_right": 1,
       "pin_button": 5,
-      "sensitivity": 20,
+      "sensitivity": 35,
       "debounce_ms": 15,
       "triple_click_window_ms": 1000,
       "triple_click_count": 3,
+      "output": "mouse",
       "click_mode": "mouse",
-      "triple_click_mode": "mouse",
-      "output": "mouse"
+      "triple_click_mode": "mouse"
     }
   },
-
-  "hardware": {
-    "button_pin": 24,
-    "led_pin":    25,
-    "encoder_clk": 6,
-    "encoder_dt":  7,
-    "encoder_sw":  8,
-    "display_sda": 4,
-    "display_scl": 5
-  },
-
-  "device": {
-    "debounce_ms": 300,
-    "cooldown_ms": 5000,
-    "armed":       true,
-    "screen_timeout_s": 15,
-    "screensaver": "tesseract",
-    "display_enabled": false,
-    "encoder_enabled": false
-  },
-
   "outputs": {
     "hid": {
       "type": "hid",
       "enabled": true,
       "usb_layout": "us"
     },
-    "opto_pwr": {
-      "type": "gpio",
-      "enabled": true,
-      "pin": 14,
-      "active_high": true,
-      "label": "Nettop Power Button",
-      "default_scenario": "scenario_opto_pwr_pulse",
-      "auto_boot": {
-        "enabled": true,
-        "check_interval_s": 15,
-        "max_attempts": 2,
-        "retry_cooldown_min": 5
-      }
-    },
     "mouse": {
       "type": "mouse",
       "enabled": true
-    },
-    "serial": {
-      "type": "serial",
-      "enabled": true
     }
   },
-
   "passive": {
-    "hall_sensor_1": {
-      "pipeline": ["scenario_shutdown"],
-      "loop": false
-    },
-    "hall_sensor_2": {
-      "pipeline": ["scenario_shutdown"],
-      "loop": false
-    },
-    "ina226": {
-      "pipeline": ["scenario_shutdown"],
-      "loop": false
-    },
     "btn_double": {
-      "pipeline": ["scenario_lock"],
+      "pipeline": [
+        "serial-test"
+      ],
+      "loop": false
+    },
+    "trackball_1_click": {
+      "pipeline": [],
+      "loop": false
+    },
+    "trackball_1_triple_click": {
+      "pipeline": [
+        "serial-test"
+      ],
       "loop": false
     }
   },
-
   "active_menu": [
     {
-      "id": "test_folder_1",
-      "label": "Folder 1",
-      "submenu": [
-        {
-          "id": "test_folder_2",
-          "label": "Folder 2",
-          "submenu": [
-            {
-              "id": "test_item_3",
-              "label": "Item 3",
-              "pipeline": ["scenario_test_nested"],
-              "loop": false
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id":    "nextcloud",
-      "label": "Nextcloud",
-      "pipeline": [
-        {"scenario": "scenario_nextcloud_stop", "label": "Stop"},
-        {"scenario": "scenario_nextcloud_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id":    "searxng",
-      "label": "SearXNG",
-      "pipeline": [
-        {"scenario": "scenario_searxng_stop", "label": "Stop"},
-        {"scenario": "scenario_searxng_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id":    "n8n",
-      "label": "n8n Stack",
-      "pipeline": [
-        {"scenario": "scenario_n8n_stop", "label": "Stop"},
-        {"scenario": "scenario_n8n_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id":    "cups",
-      "label": "CUPS Print",
-      "pipeline": [
-        {"scenario": "scenario_cups_stop", "label": "Stop"},
-        {"scenario": "scenario_cups_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id":    "dokuwiki",
-      "label": "DokuWiki",
-      "pipeline": [
-        {"scenario": "scenario_dokuwiki_stop", "label": "Stop"},
-        {"scenario": "scenario_dokuwiki_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id":    "monitoring",
-      "label": "Monitoring",
-      "pipeline": [
-        {"scenario": "scenario_monitoring_stop", "label": "Stop"},
-        {"scenario": "scenario_monitoring_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id":    "tududi",
-      "label": "Tududi",
-      "pipeline": [
-        {"scenario": "scenario_tududi_stop", "label": "Stop"},
-        {"scenario": "scenario_tududi_start", "label": "Start"}
-      ],
-      "loop": true
-    },
-    {
-      "id": "test_gpio",
-      "label": "TEST GPIO",
-      "pipeline": ["scenario_test_opto_pulse"],
-      "loop": false
+      "id": "test_encoder_mouse",
+      "label": "Test Mouse Scroll",
+      "type": "encoder_control",
+      "output_mode": "mouse"
     }
   ],
-
   "scenarios": {
-    "scenario_opto_pwr_pulse": [
-      {"output": "opto_pwr", "action": "gpio_pulse"}
+    "1": [
+      {
+        "output": "mouse",
+        "action": "move",
+        "x": 0,
+        "y": 0
+      }
     ],
-
-    "scenario_test_nested": [
-      {"output": "hid", "action": "type", "value": "Nested submenu works!"},
-      {"output": "hid", "action": "key", "combo": "enter"}
-    ],
-
-    "scenario_test_opto_pulse": [
-      {"output": "hid", "action": "type", "value": "Pressing nettop button..."},
-      {"output": "hid", "action": "key", "combo": "enter"},
-      {"wait": 500},
-      {"output": "opto_pwr", "action": "gpio_pulse"},
-      {"wait": 500},
-      {"output": "hid", "action": "type", "value": "Button released!"},
-      {"output": "hid", "action": "key", "combo": "enter"}
-    ],
-
-    "scenario_boot_server": [
-      {"output": "opto_pwr", "action": "gpio_pulse"}
-    ],
-
-    "scenario_shutdown": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  1000},
-      {"output": "hid", "action": "type",  "value": "safe_shutdown --now"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
     "scenario_lock": [
-      {"output": "hid", "action": "key", "combo": "super+l"}
+      {
+        "output": "hid",
+        "action": "key",
+        "combo": "super+l"
+      }
     ],
-
-    "scenario_nextcloud_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "sudo systemctl stop cloudflared-nextcloud; cd /opt/nextcloud && docker-compose stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
+    "serial-test": [
+      {
+        "output": "serial",
+        "action": "send_line",
+        "value": "GOTCHA"
+      },
+      {
+        "output": "serial",
+        "action": "event",
+        "name": "nova",
+        "data": {
+          "debug_mode": true,
+          "max_connections": 100,
+          "api_key": null
+        }
+      }
     ],
-
-    "scenario_nextcloud_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/nextcloud && docker-compose start; sudo systemctl start cloudflared-nextcloud"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
+    "test": [
+      {
+        "output": "hid",
+        "action": "type",
+        "value": "hello"
+      }
     ],
-
-    "scenario_searxng_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "sudo systemctl stop cloudflared-searxng; cd /opt/searxng && docker-compose stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
+    "test_copy": [
+      {
+        "output": "hid",
+        "action": "type",
+        "value": "hello1"
+      }
     ],
-
-    "scenario_searxng_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/searxng && docker-compose start; sudo systemctl start cloudflared-searxng"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_n8n_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "sudo systemctl stop cloudflared-n8n; cd /opt/n8n && docker-compose stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_n8n_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/n8n && docker-compose start; sudo systemctl start cloudflared-n8n"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_cups_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_cups_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "sudo docker-compose -f /opt/cups/docker-compose.yml start"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_dokuwiki_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/dokuwiki && docker-compose stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_dokuwiki_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/dokuwiki && docker-compose start"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_monitoring_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/monitoring && docker-compose stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_monitoring_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/monitoring && docker-compose start"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_tududi_stop": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/tududi && docker-compose stop"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-
-    "scenario_tududi_start": [
-      {"output": "hid", "action": "enter", "count": 3},
-      {"wait":  200},
-      {"output": "hid", "action": "type",  "value": "cd /opt/tududi && docker-compose start"},
-      {"output": "hid", "action": "key",   "combo": "enter"}
-    ],
-    "scenario_test_serial": [
-      {"output": "serial", "action": "send_line", "value": "Hello from Pico!"},
-      {"wait": 500},
-      {"output": "serial", "action": "event", "name": "button_pressed", "data": {"button_id": "hall_sensor_1"}}
+    "test_copy1": [
+      {
+        "output": "hid",
+        "action": "type",
+        "value": "hello2"
+      }
     ]
   }
 }

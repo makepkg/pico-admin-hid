@@ -122,12 +122,15 @@ USB HID Mouse commands — movement and clicks. Used for a trackball input, but 
 - `click`: a full press+release on `button` (`left`/`right`/`middle`, defaults to `left`).
 - `press`: presses `button` and holds it.
 - `release`: releases `button`.
+- `scroll`: rotates the wheel via `wheel` (positive/negative integer, passed straight to `adafruit_hid.mouse.Mouse.move(wheel=...)`; no `dx`/`dy`).
 
 ### Lazy Initialization and Safety
 Same pattern as `HidOutput` — the `Mouse` object is created on first `execute()` call, not at `__init__`. If USB is not connected (`supervisor.runtime.usb_connected` is `False`), the action is skipped and logged. `cleanup()` calls `release_all()` to ensure no button is left held down on stop/reload.
 
 ### Direct-Call Pattern (Trackball Input)
 Unlike scenario-driven outputs, `TrackballInput` (`inputs_manager.py`) calls `trigger_bus.execute_output("mouse", {...})` directly on every `update(now)` tick for movement, bypassing `fire()`/`fire_active()` entirely. This is intentional: a busy mouse-output call would otherwise block on the continuous movement stream from the same input if it went through the normal cooldown/priority queue. See `docs/developers/inputs.md` for the full explanation of this exception.
+
+The `"encoder_control"` menu item type (`output_mode: "mouse"`) uses this same direct-call path for the exact same reason — see [Active Trigger System — Encoder Control Mode](active-triggers.md#encoder-control-mode).
 
 ---
 

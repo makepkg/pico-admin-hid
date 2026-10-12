@@ -405,6 +405,11 @@
             color: var(--accent-cyan);
             border: 1px solid rgba(0, 229, 255, 0.3);
         }
+        .badge-encoder {
+            background: rgba(0, 255, 136, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
 
         .tree-item-sublist {
             margin-left: 20px;
@@ -868,6 +873,16 @@
                                 <option value="matrix">Matrix Rain Animation</option>
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label for="dev-display-mode" style="display: flex; align-items: center;">
+                                Display Render Mode
+                                <span class="tooltip-icon" data-tip="Text: classic menu with labels. Geometric: root menu shown as shapes (square, triangle, circle, diamond per page), 6 slots per page. Submenus stay text.">?</span>
+                            </label>
+                            <select id="dev-display-mode" onchange="updateDeviceField('display_mode', this.value)">
+                                <option value="text">Text (Classic)</option>
+                                <option value="geometric">Geometric (Shapes)</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="checkbox-group" style="margin-top: 14px;">
@@ -984,6 +999,7 @@
                     <div style="display:flex; gap:10px;">
                         <button class="btn btn-primary" onclick="addRootMenuItem('action')">+ Add Root Action</button>
                         <button class="btn btn-primary" onclick="addRootMenuItem('folder')">+ Add Root Folder</button>
+                        <button class="btn btn-primary" onclick="addRootMenuItem('encoder_control')">+ Add Direct Control</button>
                     </div>
                 </div>
                 <div class="tree-container">
@@ -1082,14 +1098,48 @@
                         <label class="checkbox-group">
                             <input type="radio" name="inspect-type" id="inspect-type-folder" onchange="toggleItemType('folder')"> Folder
                         </label>
+                        <label class="checkbox-group">
+                            <input type="radio" name="inspect-type" id="inspect-type-encoder" onchange="toggleItemType('encoder_control')"> Direct Control
+                        </label>
                     </div>
                 </div>
 
                 <div id="inspect-folder-actions-panel" class="form-group invisible">
                     <label>Add inside this folder</label>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:5px;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:5px;">
                         <button class="btn btn-sm btn-primary" onclick="addChildToInspectedFolder('action')">+ Action</button>
                         <button class="btn btn-sm btn-primary" onclick="addChildToInspectedFolder('folder')">+ Folder</button>
+                        <button class="btn btn-sm btn-primary" onclick="addChildToInspectedFolder('encoder_control')">+ Direct Control</button>
+                    </div>
+                </div>
+                <div id="inspect-encoder-panel" class="form-group invisible">
+                    <label>Output Mode</label>
+                    <select id="inspect-encoder-mode" onchange="updateInspectedEncoderMode(this.value)">
+                        <option value="mouse">Mouse (scroll + right click)</option>
+                        <option value="scenario">Scenario</option>
+                    </select>
+                    <div id="inspect-encoder-scenario-fields" class="invisible" style="margin-top: 10px; display: flex; flex-direction: column; gap: 14px;">
+                        <div>
+                            <label style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>On Rotate Right</span>
+                                <button class="btn" style="padding: 2px 8px; font-size: 0.8rem;" onclick="addEncoderFieldEntry('on_rotate_right', 'inspect-encoder-right-list')">+ Add</button>
+                            </label>
+                            <div id="inspect-encoder-right-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                        </div>
+                        <div>
+                            <label style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>On Rotate Left</span>
+                                <button class="btn" style="padding: 2px 8px; font-size: 0.8rem;" onclick="addEncoderFieldEntry('on_rotate_left', 'inspect-encoder-left-list')">+ Add</button>
+                            </label>
+                            <div id="inspect-encoder-left-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                        </div>
+                        <div>
+                            <label style="display:flex; justify-content:space-between; align-items:center;">
+                                <span>On Click</span>
+                                <button class="btn" style="padding: 2px 8px; font-size: 0.8rem;" onclick="addEncoderFieldEntry('on_click', 'inspect-encoder-click-list')">+ Add</button>
+                            </label>
+                            <div id="inspect-encoder-click-list" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -1182,7 +1232,8 @@
                 cooldown_ms: 5000,
                 armed: true,
                 screen_timeout_s: 15,
-                screensaver: "tesseract"
+                screensaver: "tesseract",
+                display_mode: "text"
             },
             passive: {},
             active_menu: [],
@@ -1399,6 +1450,7 @@
             document.getElementById('dev-encoder-enabled').checked = configData.device.encoder_enabled !== false;
             document.getElementById('dev-screen-timeout').value = configData.device.screen_timeout_s || 0;
             document.getElementById('dev-screensaver').value = configData.device.screensaver || "off";
+            document.getElementById('dev-display-mode').value = configData.device.display_mode || "text";
 
             updateDisplayGraying();
             updateEncoderGraying();
@@ -3106,8 +3158,9 @@
             div.dataset.label = item.label || "";
 
             const isFolder = 'submenu' in item;
-            const badgeType = isFolder ? 'badge-folder' : 'badge-action';
-            const badgeText = isFolder ? 'FOLDER' : 'ACTION';
+            const isEncoder = item.type === 'encoder_control';
+            const badgeType = isEncoder ? 'badge-encoder' : (isFolder ? 'badge-folder' : 'badge-action');
+            const badgeText = isEncoder ? 'CONTROL' : (isFolder ? 'FOLDER' : 'ACTION');
 
             div.innerHTML = `
                 <div class="tree-item-header">
@@ -3172,6 +3225,13 @@
             addFolderSibling.onclick = () => addSiblingItem(item, node, 'folder');
             menu.appendChild(addFolderSibling);
 
+            // 3. Add Sibling Direct Control
+            const addEncoderSibling = document.createElement('button');
+            addEncoderSibling.className = 'context-menu-item';
+            addEncoderSibling.innerHTML = '<span>+ Add Sibling Direct Control</span>';
+            addEncoderSibling.onclick = () => addSiblingItem(item, node, 'encoder_control');
+            menu.appendChild(addEncoderSibling);
+
             const sep1 = document.createElement('div');
             sep1.className = 'context-menu-separator';
             menu.appendChild(sep1);
@@ -3229,13 +3289,19 @@
         }
 
         function addSiblingItem(item, node, type) {
-            const childId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const childId = (type === 'folder' ? 'folder_' : (type === 'encoder_control' ? 'encoder_' : 'item_')) + Date.now();
             const childItem = {
                 id: childId,
-                label: type === 'folder' ? 'New Folder' : 'New Action Item'
+                label: type === 'folder' ? 'New Folder' : (type === 'encoder_control' ? 'New Direct Control' : 'New Action Item')
             };
-            if (type === 'folder') childItem.submenu = [];
-            else childItem.pipeline = [];
+            if (type === 'folder') {
+                childItem.submenu = [];
+            } else if (type === 'encoder_control') {
+                childItem.type = 'encoder_control';
+                childItem.output_mode = 'mouse';
+            } else {
+                childItem.pipeline = [];
+            }
 
             const newNode = createTreeItemNode(childItem);
             node.parentNode.insertBefore(newNode, node.nextSibling);
@@ -3248,13 +3314,19 @@
 
         function addChildItem(item, node, type) {
             const sublistNode = node.querySelector('.tree-item-sublist');
-            const childId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const childId = (type === 'folder' ? 'folder_' : (type === 'encoder_control' ? 'encoder_' : 'item_')) + Date.now();
             const childItem = {
                 id: childId,
-                label: type === 'folder' ? 'New Folder' : 'New Action Item'
+                label: type === 'folder' ? 'New Folder' : (type === 'encoder_control' ? 'New Direct Control' : 'New Action Item')
             };
-            if (type === 'folder') childItem.submenu = [];
-            else childItem.pipeline = [];
+            if (type === 'folder') {
+                childItem.submenu = [];
+            } else if (type === 'encoder_control') {
+                childItem.type = 'encoder_control';
+                childItem.output_mode = 'mouse';
+            } else {
+                childItem.pipeline = [];
+            }
 
             // Add to data structure FIRST
             if (!item.submenu) item.submenu = [];
@@ -3314,7 +3386,18 @@
                 };
 
                 const sublistEl = el.querySelector('.tree-item-sublist');
-                if (!sublistEl.classList.contains('invisible')) {
+                const isEncoderSource = sourceItem && sourceItem.type === 'encoder_control';
+                if (isEncoderSource) {
+                    // Encoder Control item - save type/output_mode/on_rotate_*/on_click,
+                    // never pipeline/loop/submenu
+                    item.type = 'encoder_control';
+                    item.output_mode = sourceItem.output_mode || 'mouse';
+                    if (sourceItem.output_mode === 'scenario') {
+                        item.on_rotate_right = sourceItem.on_rotate_right || [];
+                        item.on_rotate_left = sourceItem.on_rotate_left || [];
+                        item.on_click = sourceItem.on_click || [];
+                    }
+                } else if (!sublistEl.classList.contains('invisible')) {
                     item.submenu = serializeMenuTree(sublistEl);
                     // Save pipeline and loop if exists
                     if (sourceItem) {
@@ -3354,13 +3437,16 @@
 
         // Add root item button
         function addRootMenuItem(type) {
-            const newId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const newId = (type === 'folder' ? 'folder_' : (type === 'encoder_control' ? 'encoder_' : 'item_')) + Date.now();
             const newItem = {
                 id: newId,
-                label: type === 'folder' ? 'New Folder' : 'New Action Item'
+                label: type === 'folder' ? 'New Folder' : (type === 'encoder_control' ? 'New Direct Control' : 'New Action Item')
             };
             if (type === 'folder') {
                 newItem.submenu = [];
+            } else if (type === 'encoder_control') {
+                newItem.type = 'encoder_control';
+                newItem.output_mode = 'mouse';
             } else {
                 newItem.pipeline = [];
             }
@@ -3400,8 +3486,10 @@
             document.getElementById('inspect-label').value = currentItem.label || "";
 
             const isFolder = 'submenu' in currentItem;
-            document.getElementById('inspect-type-action').checked = !isFolder;
+            const isEncoder = currentItem.type === 'encoder_control';
+            document.getElementById('inspect-type-action').checked = !isFolder && !isEncoder;
             document.getElementById('inspect-type-folder').checked = isFolder;
+            document.getElementById('inspect-type-encoder').checked = isEncoder;
 
             // Update label tooltip based on type
             const labelTooltip = document.getElementById('inspect-label-tooltip');
@@ -3418,6 +3506,9 @@
                 if (pipelineTooltip) {
                     pipelineTooltip.setAttribute('data-tip', 'Scenarios that run when entering this folder');
                 }
+            } else if (isEncoder) {
+                labelTooltip.setAttribute('data-tip', 'Label shown on screen while this control mode is active');
+                if (labelText) labelText.textContent = 'Control label';
             } else {
                 labelTooltip.setAttribute('data-tip', 'Text shown on screen for this action');
                 if (labelText) labelText.textContent = 'Action label';
@@ -3436,6 +3527,16 @@
                 folderActionsPanel.classList.add('invisible');
             }
 
+            const sequencePanel = document.getElementById('inspect-sequence-panel');
+            const encoderPanel = document.getElementById('inspect-encoder-panel');
+            if (isEncoder) {
+                if (sequencePanel) sequencePanel.classList.add('invisible');
+                if (encoderPanel) encoderPanel.classList.remove('invisible');
+            } else {
+                if (sequencePanel) sequencePanel.classList.remove('invisible');
+                if (encoderPanel) encoderPanel.classList.add('invisible');
+            }
+
             // Show hint - check both pipeline and sequence (backward compatibility)
             const sequenceHint = document.getElementById('inspect-sequence-hint');
             const hasPipeline = (currentItem.pipeline && currentItem.pipeline.length > 0) ||
@@ -3446,7 +3547,21 @@
                 sequenceHint.style.display = 'none';
             }
 
-            renderInspectorSequence();
+            if (isEncoder) {
+                const modeSelect = document.getElementById('inspect-encoder-mode');
+                if (modeSelect) modeSelect.value = currentItem.output_mode || 'mouse';
+                const scenarioFields = document.getElementById('inspect-encoder-scenario-fields');
+                if (scenarioFields) {
+                    if (currentItem.output_mode === 'scenario') {
+                        scenarioFields.classList.remove('invisible');
+                        renderEncoderFields();
+                    } else {
+                        scenarioFields.classList.add('invisible');
+                    }
+                }
+            } else {
+                renderInspectorSequence();
+            }
 
             // Log for debugging
             console.log(`Inspecting: ID="${currentItem.id}", Label="${currentItem.label || '(empty)'}"`);
@@ -3544,13 +3659,16 @@
             if (!('submenu' in parentItem)) return;
 
             const parentId = parentItem.id;
-            const childId = (type === 'folder' ? 'folder_' : 'item_') + Date.now();
+            const childId = (type === 'folder' ? 'folder_' : (type === 'encoder_control' ? 'encoder_' : 'item_')) + Date.now();
             const childItem = {
                 id: childId,
-                label: type === 'folder' ? 'New Subfolder' : 'New Sub-item'
+                label: type === 'folder' ? 'New Subfolder' : (type === 'encoder_control' ? 'New Direct Control' : 'New Sub-item')
             };
             if (type === 'folder') {
                 childItem.submenu = [];
+            } else if (type === 'encoder_control') {
+                childItem.type = 'encoder_control';
+                childItem.output_mode = 'mouse';
             } else {
                 childItem.sequence = [];
             }
@@ -3578,6 +3696,107 @@
             }
         }
 
+        // ── Encoder Control: field list editors (on_rotate_right / on_rotate_left / on_click) ──
+
+        function renderEncoderFieldList(fieldName, containerId) {
+            const list = document.getElementById(containerId);
+            if (!list) return;
+            if (!configData || !selectedItemRef) return;
+            list.innerHTML = '';
+            const item = selectedItemRef.item;
+            if (!item[fieldName]) {
+                item[fieldName] = [];
+            }
+            if (item[fieldName].length === 0) {
+                list.innerHTML = `<div style="color:var(--text-muted); font-size:0.85rem; text-align:center; padding:10px; border:1px dashed var(--border); border-radius:6px;">No scenarios assigned</div>`;
+                return;
+            }
+            item[fieldName].forEach((scenarioName, idx) => {
+                const div = document.createElement('div');
+                div.style.display = 'grid';
+                div.style.gridTemplateColumns = '1fr auto';
+                div.style.gap = '8px';
+                div.style.alignItems = 'center';
+                div.innerHTML = `
+                    <select onchange="updateEncoderFieldEntry('${fieldName}', ${idx}, this.value)" onkeydown="if(event.key==='Enter') this.blur();">
+                        ${getScenariosOptions(scenarioName)}
+                    </select>
+                    <button class="step-delete-btn" onclick="deleteEncoderFieldEntry('${fieldName}', ${idx}, '${containerId}')">&times;</button>
+                `;
+                list.appendChild(div);
+            });
+            new Sortable(list, {
+                animation: 150,
+                onEnd: function() {
+                    saveEncoderFieldOrder(fieldName, list);
+                }
+            });
+        }
+
+        function addEncoderFieldEntry(fieldName, containerId) {
+            if (!selectedItemRef) return;
+            const item = selectedItemRef.item;
+            const firstScenario = Object.keys(configData.scenarios)[0] || "scenario_test_nested";
+            if (!configData.scenarios[firstScenario]) {
+                configData.scenarios[firstScenario] = [];
+            }
+            if (!item[fieldName]) item[fieldName] = [];
+            item[fieldName].push(firstScenario);
+            renderEncoderFieldList(fieldName, containerId);
+            saveAndSyncMenu();
+        }
+
+        function updateEncoderFieldEntry(fieldName, idx, value) {
+            if (!selectedItemRef) return;
+            selectedItemRef.item[fieldName][idx] = value;
+            saveAndSyncMenu();
+        }
+
+        function deleteEncoderFieldEntry(fieldName, idx, containerId) {
+            if (!selectedItemRef) return;
+            selectedItemRef.item[fieldName].splice(idx, 1);
+            renderEncoderFieldList(fieldName, containerId);
+            saveAndSyncMenu();
+        }
+
+        function saveEncoderFieldOrder(fieldName, container) {
+            if (!selectedItemRef) return;
+            const items = Array.from(container.children);
+            const newOrder = items.map(row => {
+                const select = row.querySelector('select');
+                return select ? select.value : '';
+            }).filter(v => v !== '');
+            selectedItemRef.item[fieldName] = newOrder;
+            saveAndSyncMenu();
+        }
+
+        function renderEncoderFields() {
+            renderEncoderFieldList('on_rotate_right', 'inspect-encoder-right-list');
+            renderEncoderFieldList('on_rotate_left', 'inspect-encoder-left-list');
+            renderEncoderFieldList('on_click', 'inspect-encoder-click-list');
+        }
+
+        function updateInspectedEncoderMode(mode) {
+            if (!selectedItemRef) return;
+            const item = selectedItemRef.item;
+            item.output_mode = mode;
+            if (mode === 'scenario') {
+                if (!item.on_rotate_right) item.on_rotate_right = [];
+                if (!item.on_rotate_left) item.on_rotate_left = [];
+                if (!item.on_click) item.on_click = [];
+            }
+            const scenarioFields = document.getElementById('inspect-encoder-scenario-fields');
+            if (scenarioFields) {
+                if (mode === 'scenario') {
+                    scenarioFields.classList.remove('invisible');
+                    renderEncoderFields();
+                } else {
+                    scenarioFields.classList.add('invisible');
+                }
+            }
+            saveAndSyncMenu();
+        }
+
         function toggleItemType(type) {
             if (!selectedItemRef) return;
             const item = selectedItemRef.item;
@@ -3586,6 +3805,13 @@
             const folderActionsPanel = document.getElementById('inspect-folder-actions-panel');
 
             if (type === 'folder') {
+                if (item.type === 'encoder_control') {
+                    delete item.type;
+                    delete item.output_mode;
+                    delete item.on_rotate_right;
+                    delete item.on_rotate_left;
+                    delete item.on_click;
+                }
                 if (!('submenu' in item)) {
                     item.submenu = [];
                 }
@@ -3614,7 +3840,41 @@
                 }
                 
                 initSortableOnList(sublistNode);
+            } else if (type === 'encoder_control') {
+                if ('submenu' in item) {
+                    if (item.submenu.length > 0 && !confirm('All submenus in this folder will be deleted. Continue?')) {
+                        inspectMenuItem({}, selectedItemRef.node);
+                        return;
+                    }
+                    delete item.submenu;
+                }
+                if ('pipeline' in item) delete item.pipeline;
+                if ('loop' in item) delete item.loop;
+                if ('sequence' in item) delete item.sequence;
+                item.type = 'encoder_control';
+                if (!item.output_mode) item.output_mode = 'mouse';
+                sublistNode.classList.add('invisible');
+                folderActionsPanel.classList.add('invisible');
+                titleBadge.className = 'item-badge badge-encoder';
+                titleBadge.textContent = 'CONTROL';
+
+                // Update label tooltip for encoder control
+                const labelTooltip = document.getElementById('inspect-label-tooltip');
+                const labelText = document.getElementById('inspect-label-text');
+                if (labelTooltip) {
+                    labelTooltip.setAttribute('data-tip', 'Label shown on screen while this control mode is active');
+                }
+                if (labelText) {
+                    labelText.textContent = 'Control label';
+                }
             } else {
+                if (item.type === 'encoder_control') {
+                    delete item.type;
+                    delete item.output_mode;
+                    delete item.on_rotate_right;
+                    delete item.on_rotate_left;
+                    delete item.on_click;
+                }
                 if ('submenu' in item) {
                     if (item.submenu.length > 0 && !confirm('All submenus in this folder will be deleted. Continue?')) {
                         document.getElementById('inspect-type-folder').checked = true;

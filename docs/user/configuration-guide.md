@@ -222,7 +222,22 @@ Controls a physical digital pin (e.g., relay, optocoupler).
 - `active_high`: Defines the electrical level for the "active" state.
 - `default_scenario`: A UI convention used by Config Studio to auto-generate a 1-step scenario for this output.
 
-### 3. Auto-Boot (Inside GPIO Output)
+### 3. Mouse Output
+Sends USB HID mouse movement, clicks, and scroll events to the connected host computer.
+
+```json
+"outputs": {
+  "mouse": {
+    "type": "mouse",
+    "enabled": true
+  }
+}
+```
+- `type`: Must be `"mouse"`.
+- Supported step actions: `move` (`dx`/`dy`), `click`/`press`/`release` (`button`: `left`/`right`/`middle`), `scroll` (`wheel`, positive or negative).
+- Used directly by the trackball input and by `encoder_control` items with `output_mode: "mouse"` — both call this output without going through a scenario pipeline. See [Outputs Guide](../developers/outputs.md#built-in-output-mouse-output_mousepy) for details.
+
+### 4. Auto-Boot (Inside GPIO Output)
 Automatically pulses a GPIO pin if the USB connection is not detected after boot.
 *(Note: Supported on only **one** GPIO output at a time).*
 
@@ -254,15 +269,39 @@ Controls global device behavior and timing parameters.
   "armed": true,
   "debounce_ms": 300,
   "cooldown_ms": 5000,
+  "display_enabled": true,
+  "encoder_enabled": true,
   "screen_timeout_s": 15,
-  "screensaver": "tesseract"
+  "screensaver": "tesseract",
+  "display_mode": "text"
 }
 ```
 - `armed`: Master switch for Hall sensor triggers.
 - `debounce_ms`: Anti-bounce delay for sensors.
 - `cooldown_ms`: Global cooldown between active scenario executions to prevent spam.
-- `screen_timeout_s`: Seconds of inactivity before screen sleeps or screensaver starts.
+- `display_enabled`: Enable or disable OLED display. When `false`, display pins are freed and `display.py` is not initialized.
+- `encoder_enabled`: Enable or disable rotary encoder. When `false`, encoder pins are freed and `encoder.py` is not initialized.
+- `screen_timeout_s`: Seconds of inactivity before screen sleeps or screensaver starts. Set to `0` to disable.
 - `screensaver`: `"off"`, `"tesseract"`, `"starfield"`, or `"matrix"`.
+- `display_mode`: Menu render mode — `"text"` (default, classic labels) or `"geometric"` (shape-based root menu). Only applies when `display_enabled: true`.
+
+#### Display Mode: Geometric
+
+When `display_mode: "geometric"`, the **root menu** (top-level `active_menu`) is rendered as shapes instead of text labels:
+
+- **6 slots per page** — Items are shown as geometric shapes, position indicates order in `active_menu`.
+- **Shape per page** — Page 0: squares, Page 1: triangles, Page 2: circles, Page 3: diamonds, then repeats.
+- **Selected item** — Filled shape, 28px size.
+- **Unselected items** — Outline shape, 16px size.
+- **Navigation** — No wraparound: scrolling past first/last item triggers a bump animation (6px push + spring back in 160ms) with a 2px wall indicator. Repeat bumps within 200ms are ignored.
+- **Animations** — Time-based: grow/shrink 140ms, page slide 180ms. Rendering uses `bitmaptools.fill_region` with pixel fallback.
+
+**Limitations**:
+- Submenus, status screens, encoder control, and screensavers remain text-based.
+- After 4 pages (24 items), shapes repeat — items are distinguished only by position.
+- Text mode and submenus retain circular scrolling.
+
+**Error handling**: If geometric rendering fails, display automatically falls back to text mode with a console warning.
 
 ---
 
@@ -355,6 +394,20 @@ Defines hierarchical menu structure for encoder navigation.
   "submenu": [ ... ]
 }
 ```
+
+**4. Encoder Control Item** (direct-input mode, not a folder or a pipeline action):
+```json
+{
+  "id": "video_control",
+  "label": "Video Control",
+  "type": "encoder_control",
+  "output_mode": "scenario",
+  "on_rotate_right": ["scenario_arrow_right"],
+  "on_rotate_left": ["scenario_arrow_left"],
+  "on_click": ["scenario_pause"]
+}
+```
+Clicking this item does not enter a submenu or fire a pipeline in the usual sense — it puts the encoder into a direct-control mode until a long press exits it. `output_mode` is either `"mouse"` (fixed scroll + right-click, no further configuration) or `"scenario"` (the three `on_rotate_*`/`on_click` fields, each a plain array of scenario names, run on the respective event with no looping). See [Encoder Control Mode](../developers/active-triggers.md#encoder-control-mode) for the full behavior.
 
 ---
 
